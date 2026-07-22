@@ -1,0 +1,37 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: swine
+      POSTGRES_USER: swine
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U swine -d swine"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: 3000
+      DATABASE_URL: postgres://swine:${POSTGRES_PASSWORD:-change-me}@db:5432/swine
+      JWT_SECRET: ${JWT_SECRET:-replace-this-before-production}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-1111}
+    ports:
+      - "3000:3000"
+    volumes:
+      - uploads_data:/app/uploads
+      - files_data:/app/files
+
+volumes:
+  postgres_data:
+  uploads_data:
+  files_data:

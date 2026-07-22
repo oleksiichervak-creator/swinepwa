@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#18222f"><link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="/styles.css"><style>.page-subtitle{margin:2px 0 0}#admin{display:grid;grid-template-columns:240px minmax(0,1fr);grid-template-rows:auto 1fr;gap:24px}#admin>header{grid-column:1/-1;margin-bottom:0}#admin>section{grid-column:2;grid-row:2;min-width:0}.table-tabs{grid-column:1;grid-row:2;display:flex;flex-direction:column;gap:5px;margin:0;padding:10px;background:#e8edf0;border-radius:14px;width:100%;align-self:start;position:sticky;top:24px;max-height:calc(100vh - 48px);overflow-y:auto}.nav-button{display:flex;align-items:center;justify-content:space-between;gap:9px;width:100%;background:transparent;color:#596671;padding:10px 12px;text-align:left}.nav-button:hover,.nav-button.active{background:#fff;color:#18222f;box-shadow:0 2px 8px #17212b12}.count{display:inline-grid;place-items:center;min-width:23px;height:23px;padding:0 6px;border-radius:12px;background:#d7dee3;font-size:12px}.nav-button.active .count{background:#286445;color:#fff}.empty-state{text-align:center;color:#78838d;padding:44px}@media(max-width:760px){#admin{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto 1fr;gap:16px}#admin>header{grid-column:1;grid-row:1}.table-tabs{grid-column:1;grid-row:2;position:static;flex-direction:row;overflow-x:auto;overflow-y:hidden;padding:6px}.nav-button{width:auto;min-width:max-content}#admin>section{grid-column:1;grid-row:3}}</style><title>Swine Admin</title>
+</head>
+<body>
+  <main>
+    <section id="login" class="card login-card">
+      <div class="brand">SA</div><h1>Swine Admin</h1><p>Sign in to manage your data</p>
+      <form id="login-form">
+        <label>Username<input name="username" autocomplete="username" required value="Oleksii"></label>
+        <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
+        <button type="submit">Sign in</button><div class="error" id="login-error"></div>
+      </form>
+    </section>
+    <section id="admin" hidden>
+      <header><div><small>SWINE ADMIN</small><h1>Data tables</h1><p class="page-subtitle">Browse and test application data</p></div><div><span id="current-user"></span><button class="secondary" id="logout">Sign out</button></div></header>
+      <nav class="table-tabs" role="tablist" aria-label="Data tables">
+        <button class="nav-button active" role="tab" aria-selected="true" aria-controls="users-page" data-page="users">Users <span id="users-count" class="count">0</span></button>
+        <button class="nav-button" role="tab" aria-selected="false" aria-controls="departments-page" data-page="departments">Departments <span id="departments-count" class="count">0</span></button>
+        <button class="nav-button" role="tab" aria-selected="false" aria-controls="rooms-page" data-page="rooms">Rooms <span id="rooms-count" class="count">0</span></button>
+        <button class="nav-button" role="tab" aria-selected="false" aria-controls="pens-page" data-page="pens">Pens <span id="pens-count" class="count">0</span></button>
+        <button class="nav-button" role="tab" aria-selected="false" aria-controls="medicine-sow-page" data-page="medicine-sow">Medicine Sow <span id="medicine-sow-count" class="count">0</span></button>
+        <button class="nav-button" role="tab" aria-selected="false" aria-controls="medicine-sow-storage-page" data-page="medicine-sow-storage">Medicine Sow Storage <span id="medicine-sow-storage-count" class="count">0</span></button>
+        <button class="nav-button" role="tab" aria-selected="false" aria-controls="sow-injections-page" data-page="sow-injections">Planned sow injections <span id="sow-injections-count" class="count">0</span></button>
+        <button class="nav-button" role="tab" aria-selected="false" aria-controls="done-sow-page" data-page="done-sow">Done sow injections <span id="done-sow-count" class="count">0</span></button>
+        <button class="nav-button" role="tab" aria-selected="false" aria-controls="vet-questions-page" data-page="vet-questions">Vet Questions <span id="vet-questions-count" class="count">0</span></button>
+        <button class="nav-button" role="tab" aria-selected="false" aria-controls="file-storage-page" data-page="file-storage">File Storage <span id="file-storage-count" class="count">0</span></button>
+        <button class="nav-button" role="tab" aria-selected="false" aria-controls="daily-remarks-page" data-page="daily-remarks">Daily Remarks <span id="daily-remarks-count" class="count">0</span></button>
+        <button class="nav-button" role="tab" aria-selected="false" aria-controls="repair-locations-page" data-page="repair-locations">Repair Locations <span id="repair-locations-count" class="count">0</span></button>
+        <button class="nav-button" role="tab" aria-selected="false" aria-controls="todos-page" data-page="todos">Todo List <span id="todos-count" class="count">0</span></button>
+      </nav>
+      <section id="users-page" role="tabpanel">
+        <div class="toolbar"><p>Manage access and user roles</p><button id="add-user">+ Add user</button></div>
+        <div class="table-wrap"><table><thead><tr><th>ID</th><th>Username</th><th>Role</th><th>Created</th><th></th></tr></thead><tbody id="users"></tbody></table></div>
+      </section>
+      <section id="departments-page" role="tabpanel" hidden>
+        <div class="toolbar"><p>Manage farm departments</p><button id="add-department">+ Add department</button></div>
+        <div class="table-wrap"><table><thead><tr><th>ID</th><th>Name</th><th>Created</th><th>Updated</th><th></th></tr></thead><tbody id="departments"></tbody></table></div>
+      </section>
+      <section id="rooms-page" role="tabpanel" hidden>
+        <div class="toolbar"><p>Manage rooms within departments</p><button id="add-room">+ Add room</button></div>
+        <div class="table-wrap"><table><thead><tr><th>ID</th><th>Name</th><th>Department</th><th>Created</th><th>Updated</th><th></th></tr></thead><tbody id="rooms"></tbody></table></div>
+      </section>
+      <section id="pens-page" role="tabpanel" hidden>
+        <div class="toolbar"><p>Manage pens within rooms</p><button id="add-pen">+ Add pen</button></div>
+        <div class="table-wrap"><table><thead><tr><th>ID</th><th>Name</th><th>Room</th><th>Department</th><th>Created</th><th>Updated</th><th></th></tr></thead><tbody id="pens"></tbody></table></div>
+      </section>
+      <section id="medicine-sow-page" role="tabpanel" hidden>
+        <div class="toolbar"><p>Manage medicines for sows</p><button id="add-medicine-sow">+ Add medicine</button></div>
+        <div class="table-wrap"><table><thead><tr><th>ID</th><th>Name</th><th>Diagnosis</th><th>Dose ml</th><th>Dose kg</th><th>Course</th><th>Interval</th><th>Withdrawal</th><th></th></tr></thead><tbody id="medicine-sow"></tbody></table></div>
+      </section>
+      <section id="medicine-sow-storage-page" role="tabpanel" hidden>
+        <div class="toolbar"><p>Manage sow medicine stock</p><button id="add-medicine-sow-storage">+ Add stock</button></div>
+        <div class="table-wrap"><table><thead><tr><th>ID</th><th>Medicine</th><th>Bottle volume (ml)</th><th>Bottles</th><th>Total volume (ml)</th><th>Updated</th><th></th></tr></thead><tbody id="medicine-sow-storage"></tbody></table></div>
+      </section>
+      <section id="sow-injections-page" role="tabpanel" hidden>
+        <div class="toolbar"><p>Manage planned sow injections</p><button id="add-sow-injection">+ Add injection</button></div>
+        <div class="table-wrap"><table><thead><tr><th>ID</th><th>Sow</th><th>Pen</th><th>Date</th><th>Medicine ID</th><th>Dose (ml)</th><th>Comment</th><th></th></tr></thead><tbody id="sow-injections"></tbody></table></div>
+      </section>
+      <section id="done-sow-page" role="tabpanel" hidden><div class="toolbar"><p>Completed sow injections</p><div><input id="done-report-date" type="date"><button class="secondary" id="done-report-print">Print week</button><button class="secondary" id="done-report-xlsx">XLSX</button><button id="add-done-sow">+ Add injection</button></div></div><div class="table-wrap"><table><thead><tr><th>ID</th><th>Sow</th><th>Pen</th><th>Date</th><th>Medicine</th><th>Dose</th><th>Given by</th><th>Comment</th><th></th></tr></thead><tbody id="done-sow"></tbody></table></div></section>
+      <section id="vet-questions-page" role="tabpanel" hidden><div class="toolbar"><p>Questions for the veterinarian</p><button id="add-vet-question">+ Add question</button></div><div class="table-wrap"><table><thead><tr><th>ID</th><th>Date</th><th>Question</th><th>Photo</th><th>Updated</th><th></th></tr></thead><tbody id="vet-questions"></tbody></table></div></section>
+      <section id="file-storage-page" role="tabpanel" hidden><div class="toolbar"><p>Shared application files (maximum 25 MB)</p><div><button id="file-storage-upload">Upload file</button><input id="file-storage-input" type="file" hidden></div></div><div class="error" id="file-storage-error"></div><div class="table-wrap"><table><thead><tr><th>Name</th><th>Type</th><th>Size</th><th>Uploaded by</th><th>Created</th><th></th></tr></thead><tbody id="file-storage"></tbody></table></div></section>
+      <section id="daily-remarks-page" role="tabpanel" hidden><div class="toolbar"><p>Daily farm notes and photos</p><button id="add-daily-remark">+ Add remark</button></div><div class="table-wrap"><table><thead><tr><th>ID</th><th>Date</th><th>Remark</th><th>Photo</th><th>Updated</th><th></th></tr></thead><tbody id="daily-remarks"></tbody></table></div></section>
+      <section id="repair-locations-page" role="tabpanel" hidden><div class="toolbar"><p>Track repairs by location</p><button id="add-repair-location">+ Add repair</button></div><div class="table-wrap"><table><thead><tr><th>ID</th><th>Date</th><th>Location</th><th>Comment</th><th>Photo</th><th>Updated</th><th></th></tr></thead><tbody id="repair-locations"></tbody></table></div></section>
+      <section id="todos-page" role="tabpanel" hidden><div class="toolbar"><p>Tasks and due dates</p><button id="add-todo">+ Add task</button></div><div class="table-wrap"><table><thead><tr><th>Status</th><th>Task</th><th>Due date</th><th>Completed at</th><th></th></tr></thead><tbody id="todos"></tbody></table></div></section>
+    </section>
+  </main>
+  <dialog id="user-dialog"><form id="user-form"><h2 id="dialog-title">User</h2><input type="hidden" name="id">
+    <label>Username<input name="username" required minlength="2" maxlength="100"></label>
+    <label>Password<input name="password" type="password" minlength="4"><small>Leave blank when editing to keep the current password</small></label>
+    <label>Role<select name="role"><option value="user">user</option><option value="admin">admin</option></select></label>
+    <div class="error" id="form-error"></div><div class="actions"><button type="button" class="secondary" id="cancel">Cancel</button><button type="submit">Save</button></div>
+  </form></dialog>
+  <dialog id="department-dialog"><form id="department-form"><h2 id="department-dialog-title">Department</h2><input type="hidden" name="id">
+    <label>Name<input name="name" required maxlength="150"></label>
+    <div class="error" id="department-error"></div><div class="actions"><button type="button" class="secondary" id="department-cancel">Cancel</button><button type="submit">Save</button></div>
+  </form></dialog>
+  <dialog id="room-dialog"><form id="room-form"><h2 id="room-dialog-title">Room</h2><input type="hidden" name="id">
+    <label>Name<input name="name" required maxlength="150"></label>
+    <label>Department<select name="department_id" required></select></label>
+    <div class="error" id="room-error"></div><div class="actions"><button type="button" class="secondary" id="room-cancel">Cancel</button><button type="submit">Save</button></div>
+  </form></dialog>
+  <dialog id="pen-dialog"><form id="pen-form"><h2 id="pen-dialog-title">Pen</h2><input type="hidden" name="id">
+    <label>Name<input name="name" required maxlength="150"></label>
+    <label>Room<select name="room_id" required></select></label>
+    <div class="error" id="pen-error"></div><div class="actions"><button type="button" class="secondary" id="pen-cancel">Cancel</button><button type="submit">Save</button></div>
+  </form></dialog>
+  <dialog id="sow-injection-dialog"><form id="sow-injection-form"><h2 id="sow-injection-dialog-title">Planned sow injection</h2><input type="hidden" name="id">
+    <label>Sow number<input name="sow_number" required maxlength="100"></label>
+    <label>Pen<select name="pen_id" required></select></label>
+    <label>Injection date<input name="injection_date" type="date" required></label>
+    <label>Medicine<select name="medicine_sow_id" required></select></label>
+    <label>Dose (ml)<input name="dose_ml" type="number" min="0" step="0.001" required></label>
+    <label>Comment<input name="comment"></label>
+    <div class="error" id="sow-injection-error"></div><div class="actions"><button type="button" class="secondary" id="sow-injection-cancel">Cancel</button><button type="submit">Save</button></div>
+  </form></dialog>
+  <dialog id="medicine-sow-dialog"><form id="medicine-sow-form"><h2 id="medicine-sow-dialog-title">Sow medicine</h2><input type="hidden" name="id">
+    <label>Name<input name="name" required maxlength="200"></label><label>Diagnosis<input name="diagnosis" required maxlength="300"></label>
+    <label>Dose (ml)<input name="dose_ml" type="number" min="0" step="0.001" required></label><label>Dose (kg)<input name="dose_kg" type="number" min="0" step="0.001" required></label>
+    <label>Course days<input name="course_days" type="number" min="0" step="1" required></label><label>Interval hours<input name="interval_hours" type="number" min="0" step="1" required></label>
+    <label>Symptoms<input name="symptoms" required></label><label>Withdrawal days<input name="withdrawal_days" type="number" min="0" step="1" required></label>
+    <div class="error" id="medicine-sow-error"></div><div class="actions"><button type="button" class="secondary" id="medicine-sow-cancel">Cancel</button><button type="submit">Save</button></div>
+  </form></dialog>
+  <dialog id="medicine-sow-storage-dialog"><form id="medicine-sow-storage-form"><h2 id="medicine-sow-storage-dialog-title">Sow medicine stock</h2><input type="hidden" name="id">
+    <label>Medicine<select name="medicine_sow_id" required></select></label>
+    <label>Bottle volume (ml)<input name="bottle_volume_ml" type="number" min="0" step="0.001" required></label>
+    <label>Bottle count<input name="bottle_count" type="number" min="0" step="1" required></label>
+    <label>Total volume (ml)<input name="total_volume_ml" type="number" min="0" step="0.001" required></label>
+    <div class="error" id="medicine-sow-storage-error"></div><div class="actions"><button type="button" class="secondary" id="medicine-sow-storage-cancel">Cancel</button><button type="submit">Save</button></div>
+  </form></dialog>
+  <dialog id="done-sow-dialog"><form id="done-sow-form"><h2 id="done-sow-dialog-title">Done sow injection</h2><input type="hidden" name="id"><label>Sow number<input name="sow_number" required maxlength="100"></label><label>Pen<select name="pen_id" required></select></label><label>Date<input name="injection_date" type="date" required></label><label>Medicine<select name="medicine_sow_id" required></select></label><label>Dose (ml)<input name="dose_ml" type="number" min="0" step="0.001" required></label><label>Given by<select name="given_by_user_id" required></select></label><label>Comment<input name="comment"></label><div class="error" id="done-sow-error"></div><div class="actions"><button type="button" class="secondary" id="done-sow-cancel">Cancel</button><button type="submit">Save</button></div></form></dialog>
+  <dialog id="vet-question-dialog"><form id="vet-question-form"><h2 id="vet-question-dialog-title">Vet question</h2><input type="hidden" name="id"><input type="hidden" name="photo"><label>Question date<input name="question_date" type="date" required></label><label>Question<textarea name="question" required rows="4"></textarea></label><label>Photo (optional)<input name="file" type="file" accept="image/jpeg,image/png,image/webp"></label><div id="vet-photo-preview"></div><div class="error" id="vet-question-error"></div><div class="actions"><button type="button" class="secondary" id="vet-question-cancel">Cancel</button><button type="submit">Save</button></div></form></dialog>
+  <dialog id="daily-remark-dialog"><form id="daily-remark-form"><h2 id="daily-remark-dialog-title">Daily remark</h2><input type="hidden" name="id"><input type="hidden" name="photo"><label>Remark date<input name="remark_date" type="date" required></label><label>Remark<textarea name="remark" required rows="4"></textarea></label><label>Photo (optional)<input name="file" type="file" accept="image/jpeg,image/png,image/webp"></label><div id="daily-photo-preview"></div><div class="error" id="daily-remark-error"></div><div class="actions"><button type="button" class="secondary" id="daily-remark-cancel">Cancel</button><button type="submit">Save</button></div></form></dialog>
+  <dialog id="repair-location-dialog"><form id="repair-location-form"><h2 id="repair-location-dialog-title">Repair location</h2><input type="hidden" name="id"><input type="hidden" name="photo"><label>Repair date<input name="repair_date" type="date" required></label><label>Location<input name="location" required maxlength="300"></label><label>Comment<textarea name="comment" rows="3"></textarea></label><label>Photo (optional)<input name="file" type="file" accept="image/jpeg,image/png,image/webp"></label><div id="repair-photo-preview"></div><div class="error" id="repair-location-error"></div><div class="actions"><button type="button" class="secondary" id="repair-location-cancel">Cancel</button><button type="submit">Save</button></div></form></dialog>
+  <dialog id="todo-dialog"><form id="todo-form"><h2 id="todo-dialog-title">Task</h2><input type="hidden" name="id"><label>Task<textarea name="task" required maxlength="2000" rows="4"></textarea></label><label>Due date<input name="due_date" type="date" required></label><label><span><input name="is_completed" type="checkbox" style="width:auto"> Completed</span></label><div class="error" id="todo-error"></div><div class="actions"><button type="button" class="secondary" id="todo-cancel">Cancel</button><button type="submit">Save</button></div></form></dialog>
+  <script type="module" src="/app.js"></script>
+</body></html>
