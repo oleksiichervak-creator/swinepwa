@@ -91,9 +91,8 @@ Create these GitHub Environment secrets under `production`:
 - `HETZNER_HOST` — server IPv4/hostname
 - `HETZNER_USER` — SSH user
 - `HETZNER_SSH_KEY` — private Ed25519 key
-- `DOMAIN` — domain whose A/AAAA record points to Hetzner
 - `POSTGRES_PASSWORD` — strong database password
 - `JWT_SECRET` — random secret of at least 32 characters
 - `ADMIN_PASSWORD` — initial Oleksii password for a fresh database
 
-Open TCP ports 22, 80, and 443 (plus UDP 443 for HTTP/3). Caddy obtains and renews the TLS certificate automatically after DNS resolves to the server.
+The app binds only to `127.0.0.1:3000`; the server's Nginx terminates HTTPS and proxies the public domain to that port. Open TCP ports 22, 80, and 443.

@@ -37,10 +37,9 @@ jobs:
         env:
           SSH_HOST: ${{ secrets.HETZNER_HOST }}
           SSH_USER: ${{ secrets.HETZNER_USER }}
-          DOMAIN: ${{ secrets.DOMAIN }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
         run: |
-          ENV_CONTENT=$(printf 'DOMAIN=%s\nPOSTGRES_PASSWORD=%s\nJWT_SECRET=%s\nADMIN_PASSWORD=%s\n' "$DOMAIN" "$POSTGRES_PASSWORD" "$JWT_SECRET" "$ADMIN_PASSWORD" | base64 -w0)
+          ENV_CONTENT=$(printf 'POSTGRES_PASSWORD=%s\nJWT_SECRET=%s\nADMIN_PASSWORD=%s\n' "$POSTGRES_PASSWORD" "$JWT_SECRET" "$ADMIN_PASSWORD" | base64 -w0)
           ssh "$SSH_USER@$SSH_HOST" "install -d -m 700 /opt/swine-pwa && echo '$ENV_CONTENT' | base64 -d > /opt/swine-pwa/.env && chmod 600 /opt/swine-pwa/.env && cd /opt/swine-pwa && docker compose -f compose.production.yaml up -d --build --remove-orphans && docker image prune -f"
