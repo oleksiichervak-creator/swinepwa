@@ -64,6 +64,16 @@ export async function initializeDatabase() {
   `);
 
   await pool.query(`
+    INSERT INTO pens (name, room_id)
+    SELECT pen_number::text, r.id
+    FROM departments d
+    JOIN rooms r ON r.department_id = d.id
+    CROSS JOIN generate_series(901, 984) AS pen_number
+    WHERE d.name = 'Lobestald' AND r.name = 'L2'
+    ON CONFLICT (room_id, name) DO NOTHING
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS medicine_sow (
       id BIGSERIAL PRIMARY KEY,
       name VARCHAR(200) NOT NULL UNIQUE,
