@@ -74,6 +74,62 @@ export async function initializeDatabase() {
   `);
 
   await pool.query(`
+    INSERT INTO pens (name, room_id)
+    SELECT pen_number::text, r.id
+    FROM departments d
+    JOIN rooms r ON r.department_id = d.id
+    CROSS JOIN generate_series(701, 718) AS pen_number
+    WHERE d.name = 'Poltestald' AND r.name = 'P1'
+    ON CONFLICT (room_id, name) DO NOTHING
+  `);
+
+  await pool.query(`
+    INSERT INTO pens (name, room_id)
+    SELECT pen_number::text, r.id
+    FROM departments d
+    JOIN rooms r ON r.department_id = d.id
+    CROSS JOIN generate_series(719, 734) AS pen_number
+    WHERE d.name = 'Poltestald' AND r.name = 'P2'
+    ON CONFLICT (room_id, name) DO NOTHING
+  `);
+
+  await pool.query(`
+    INSERT INTO pens (name, room_id)
+    SELECT pen_number::text, r.id
+    FROM departments d
+    JOIN rooms r ON r.department_id = d.id
+    CROSS JOIN (
+      SELECT generate_series(885, 899) AS pen_number
+      UNION ALL
+      SELECT generate_series(985, 999) AS pen_number
+    ) pen_numbers
+    WHERE d.name = 'Dragtestald' AND r.name = 'D2'
+    ON CONFLICT (room_id, name) DO NOTHING
+  `);
+
+  await pool.query(`
+    INSERT INTO pens (name, room_id)
+    SELECT pen_number, r.id
+    FROM departments d
+    JOIN rooms r ON r.department_id = d.id
+    CROSS JOIN (
+      SELECT generate_series(1301, 1337)::text AS pen_number
+      UNION ALL
+      SELECT pen_number
+      FROM (VALUES
+        ('1.1'), ('1.2'), ('1.3'),
+        ('2.1'), ('2.2'), ('2.3'),
+        ('3.1'), ('3.2'), ('3.3'),
+        ('4.1'), ('4.2'), ('4.3'),
+        ('5.1'), ('5.2'), ('5.3'),
+        ('6.1'), ('6.2'), ('6.3')
+      ) AS decimal_pens(pen_number)
+    ) pen_numbers
+    WHERE d.name = 'Dragtestald' AND r.name = 'D3'
+    ON CONFLICT (room_id, name) DO NOTHING
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS medicine_sow (
       id BIGSERIAL PRIMARY KEY,
       name VARCHAR(200) NOT NULL UNIQUE,
