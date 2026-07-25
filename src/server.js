@@ -564,7 +564,8 @@ async function buildDoneSowWeekReport(start){
     m.name AS medicine_name,m.diagnosis,m.course_days,m.interval_hours,p.name AS pen_name,u.username AS given_by_username
     FROM done_sow_injections i JOIN medicine_sow m ON m.id=i.medicine_sow_id
     JOIN pens p ON p.id=i.pen_id JOIN users u ON u.id=i.given_by_user_id`;
-  const history=(await pool.query(reportSelect+' WHERE i.injection_date <= $1 ORDER BY i.sow_number,i.medicine_sow_id,i.injection_date,i.id',[endDate])).rows;
+  const history=(await pool.query(reportSelect+' WHERE i.injection_date <= $1 ORDER BY i.sow_number,i.medicine_sow_id,i.injection_date,i.id',[endDate])).rows
+    .map(row=>({...row,injection_date:normalizeDate(row.injection_date,'Injection date')}));
   const courses=[];
   for(const injection of history){
     const previous=courses[courses.length-1],sameCourse=previous&&previous.sow_number===injection.sow_number&&String(previous.medicine_sow_id)===String(injection.medicine_sow_id)&&injection.injection_date<=previous.course_end;
