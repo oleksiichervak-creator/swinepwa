@@ -1,6 +1,8 @@
 const $ = (selector) => document.querySelector(selector);
 let token = localStorage.getItem('token');
 let me = null;
+let doneSowItems = [];
+let doneSowSort = { key: 'injection_date', direction: 'asc' };
 
 async function api(path, options = {}) {
   const response = await fetch('/api' + path, { ...options, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...options.headers } });
@@ -87,7 +89,44 @@ async function loadSowInjections() {
   document.querySelectorAll('.sow-injection-edit').forEach(button => button.onclick = () => openSowInjectionDialog(items.find(item => String(item.id) === button.dataset.id)));
   document.querySelectorAll('.sow-injection-delete').forEach(button => button.onclick = () => deleteSowInjection(button.dataset.id));
 }
-async function loadDoneSow(){const items=await api('/done-sow-injections/');$('#done-sow-count').textContent=items.length;$('#done-sow').innerHTML=items.length?items.map(x=>`<tr><td>${x.id}</td><td>${escapeHtml(x.sow_number)}</td><td>${escapeHtml(x.pen_name)}</td><td>${escapeHtml(x.injection_date)}</td><td>${escapeHtml(x.medicine_name)}</td><td>${x.dose_ml} ml</td><td>${escapeHtml(x.given_by_username)}</td><td>${escapeHtml(x.comment||'—')}</td><td><div class="row-actions">${me.role==='admin'?`<button class="secondary done-edit" data-id="${x.id}">Edit</button><button class="danger done-delete" data-id="${x.id}">Delete</button>`:''}</div></td></tr>`).join(''):'<tr><td colspan="9" class="empty-state">No completed sow injections yet.</td></tr>';document.querySelectorAll('.done-edit').forEach(b=>b.onclick=()=>openDoneSow(items.find(x=>String(x.id)===b.dataset.id)));document.querySelectorAll('.done-delete').forEach(b=>b.onclick=()=>deleteDoneSow(b.dataset.id));}
+async function loadDoneSow() {
+  doneSowItems = await api('/done-sow-injections/');
+  $('#done-sow-count').textContent = doneSowItems.length;
+  renderDoneSow();
+}
+
+function renderDoneSow() {
+  const query = $('#done-sow-search').value.trim().toLocaleLowerCase();
+  const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+  const items = doneSowItems
+    .filter(item => String(item.sow_number).toLocaleLowerCase().includes(query))
+    .sort((a, b) => {
+      const result = doneSowSort.key === 'injection_date'
+        ? String(a.injection_date).localeCompare(String(b.injection_date))
+        : collator.compare(String(a.sow_number), String(b.sow_number));
+      return (doneSowSort.direction === 'asc' ? result : -result) || Number(a.id) - Number(b.id);
+    });
+
+  $('#done-sow-results').textContent = query ? `${items.length} of ${doneSowItems.length}` : `${items.length} records`;
+  $('#done-sow').innerHTML = items.length
+    ? items.map(x => `<tr><td>${x.id}</td><td>${escapeHtml(x.sow_number)}</td><td>${escapeHtml(x.pen_name)}</td><td>${escapeHtml(x.injection_date)}</td><td>${escapeHtml(x.medicine_name)}</td><td>${x.dose_ml} ml</td><td>${escapeHtml(x.given_by_username)}</td><td>${escapeHtml(x.comment || '—')}</td><td><div class="row-actions">${me.role === 'admin' ? `<button class="secondary done-edit" data-id="${x.id}">Edit</button><button class="danger done-delete" data-id="${x.id}">Delete</button>` : ''}</div></td></tr>`).join('')
+    : `<tr><td colspan="9" class="empty-state">${query ? 'No sow numbers match your search.' : 'No completed sow injections yet.'}</td></tr>`;
+  document.querySelectorAll('.done-edit').forEach(button => button.onclick = () => openDoneSow(doneSowItems.find(item => String(item.id) === button.dataset.id)));
+  document.querySelectorAll('.done-delete').forEach(button => button.onclick = () => deleteDoneSow(button.dataset.id));
+}
+
+$('#done-sow-search').addEventListener('input', renderDoneSow);
+document.querySelectorAll('[data-done-sort]').forEach(button => button.addEventListener('click', () => {
+  const key = button.dataset.doneSort;
+  doneSowSort = { key, direction: doneSowSort.key === key && doneSowSort.direction === 'asc' ? 'desc' : 'asc' };
+  document.querySelectorAll('[data-done-sort]').forEach(sortButton => {
+    const active = sortButton.dataset.doneSort === key;
+    sortButton.classList.toggle('active', active);
+    sortButton.closest('th').setAttribute('aria-sort', active ? (doneSowSort.direction === 'asc' ? 'ascending' : 'descending') : 'none');
+    sortButton.querySelector('span').textContent = active ? (doneSowSort.direction === 'asc' ? '↑' : '↓') : '↕';
+  });
+  renderDoneSow();
+}));
 async function loadVetQuestions(){const items=await api('/vet-questions/');$('#vet-questions-count').textContent=items.length;$('#vet-questions').innerHTML=items.length?items.map(x=>`<tr><td>${x.id}</td><td>${escapeHtml(x.question_date)}</td><td>${escapeHtml(x.question)}</td><td>${x.photo?`<a href="${x.photo}" target="_blank"><img src="${x.photo}" alt="Attached" style="width:64px;height:48px;object-fit:cover;border-radius:6px"></a>`:'—'}</td><td>${new Date(x.updated_at).toLocaleString('en-GB')}</td><td><div class="row-actions">${me.role==='admin'?`<button class="secondary vet-edit" data-id="${x.id}">Edit</button><button class="danger vet-delete" data-id="${x.id}">Delete</button>`:''}</div></td></tr>`).join(''):'<tr><td colspan="6" class="empty-state">No vet questions yet.</td></tr>';document.querySelectorAll('.vet-edit').forEach(b=>b.onclick=()=>openVetQuestion(items.find(x=>String(x.id)===b.dataset.id)));document.querySelectorAll('.vet-delete').forEach(b=>b.onclick=()=>deleteVetQuestion(b.dataset.id));}
 
 async function loadFiles(){const items=await api('/file-storage/');$('#file-storage-count').textContent=items.length;$('#file-storage').innerHTML=items.length?items.map(x=>`<tr><td>${escapeHtml(x.original_name)}</td><td>${escapeHtml(x.mime_type)}</td><td>${formatBytes(x.size_bytes)}</td><td>${escapeHtml(x.uploaded_by_username)}</td><td>${new Date(x.created_at).toLocaleString('en-GB')}</td><td><div class="row-actions"><button class="secondary file-download" data-name="${x.stored_name}" data-original="${escapeHtml(x.original_name)}">Download</button>${me.role==='admin'?`<button class="danger file-delete" data-name="${x.stored_name}">Delete</button>`:''}</div></td></tr>`).join(''):'<tr><td colspan="6" class="empty-state">No files uploaded yet.</td></tr>';document.querySelectorAll('.file-download').forEach(b=>b.onclick=()=>downloadStoredFile(b.dataset.name,b.dataset.original));document.querySelectorAll('.file-delete').forEach(b=>b.onclick=()=>deleteStoredFile(b.dataset.name));}
