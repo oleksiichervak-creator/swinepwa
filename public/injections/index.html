@@ -57,26 +57,60 @@
 
       <section id="plan-screen" class="screen" hidden>
         <form id="plan-form" class="panel form-panel">
-          <label>Sow number
-            <input name="sow_number" required maxlength="100" inputmode="numeric" autocomplete="off">
-          </label>
-          <label>Pen
-            <select name="pen_id" required></select>
-          </label>
-          <label>Date
-            <input name="injection_date" type="date" required>
-          </label>
-          <label>Medicine
-            <select name="medicine_sow_id" required></select>
-          </label>
-          <label>Dose (ml)
-            <input name="dose_ml" type="number" min="0" step="0.001" required inputmode="decimal">
-          </label>
-          <label>Comment
-            <textarea name="comment" rows="3"></textarea>
-          </label>
+          <div class="step active" data-step="1">
+            <div class="step-heading"><span>1</span><strong>Sow number</strong></div>
+            <label>
+              <input name="sow_number" required maxlength="100" inputmode="numeric" autocomplete="off" placeholder="Enter sow number">
+            </label>
+            <button id="check-sow" class="step-button" type="button">Check history</button>
+            <div id="sow-history" class="history" hidden></div>
+          </div>
+
+          <div class="step" data-step="2" hidden>
+            <div class="step-heading"><span>2</span><strong>Pen</strong></div>
+            <label>
+              <input id="pen-input" list="pen-options" autocomplete="off" placeholder="Enter pen number">
+              <datalist id="pen-options"></datalist>
+              <input name="pen_id" type="hidden">
+            </label>
+            <button id="check-pen" class="step-button" type="button">Check pen</button>
+            <p id="pen-result" class="selection-result"></p>
+          </div>
+
+          <div class="step" data-step="3" hidden>
+            <div class="step-heading"><span>3</span><strong>Medicine</strong></div>
+            <label>
+              <select name="medicine_sow_id" required>
+                <option value="">Select medicine</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="step" data-step="4" hidden>
+            <div class="step-heading"><span>4</span><strong>Weight</strong></div>
+            <label>
+              <select name="weight_kg" required>
+                <option value="">Select weight</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="step" data-step="5" hidden>
+            <div class="step-heading"><span>5</span><strong>Review</strong></div>
+            <div id="dose-preview" class="dose-preview"></div>
+            <label id="melovem-option" class="check-option" hidden>
+              <input name="include_melovem" type="checkbox" checked>
+              <span><strong>Add Melovem</strong><small>Pain relief given together with this medicine</small></span>
+            </label>
+            <label>Date
+              <input name="injection_date" type="date" required>
+            </label>
+            <label>Comment
+              <textarea name="comment" rows="3"></textarea>
+            </label>
+            <button type="submit">Add to plan</button>
+          </div>
           <p id="plan-error" class="error" role="alert"></p>
-          <button type="submit">Add to plan</button>
         </form>
       </section>
 

@@ -528,6 +528,27 @@ app.use('/planed-sow-injections', sowInjections);
 
 const injectionPwa = express.Router();
 
+injectionPwa.get('/history', requireAuth, async (req, res, next) => {
+  try {
+    const sowNumber = String(req.query.sow_number || '').trim();
+    if (!sowNumber || sowNumber.length > 100) return res.status(400).json({ error: 'A valid sow number is required' });
+    const history = await pool.query(`
+      SELECT 'planned' AS status,i.id,i.sow_number,i.injection_date,i.dose_ml::float8 AS dose_ml,
+        i.comment,p.name AS pen_name,m.name AS medicine_name
+      FROM planed_sow_injections i
+      JOIN pens p ON p.id=i.pen_id JOIN medicine_sow m ON m.id=i.medicine_sow_id
+      WHERE lower(i.sow_number)=lower($1)
+      UNION ALL
+      SELECT 'done' AS status,i.id,i.sow_number,i.injection_date,i.dose_ml::float8 AS dose_ml,
+        i.comment,p.name AS pen_name,m.name AS medicine_name
+      FROM done_sow_injections i
+      JOIN pens p ON p.id=i.pen_id JOIN medicine_sow m ON m.id=i.medicine_sow_id
+      WHERE lower(i.sow_number)=lower($1)
+      ORDER BY injection_date DESC,id DESC`, [sowNumber]);
+    res.json(history.rows);
+  } catch (error) { next(error); }
+});
+
 injectionPwa.get('/today', requireAuth, async (req, res, next) => {
   try {
     const date = normalizeDate(req.query.date || new Date(), 'date');
@@ -539,14 +560,59 @@ injectionPwa.get('/today', requireAuth, async (req, res, next) => {
 });
 
 injectionPwa.post('/plans', requireAuth, async (req, res, next) => {
+  const client = await pool.connect();
   try {
-    const input = validateSowInjection(req.body);
-    const inserted = await pool.query(`INSERT INTO planed_sow_injections
-      (sow_number, pen_id, injection_date, medicine_sow_id, dose_ml, comment)
-      VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-      [input.sowNumber, input.penId, input.injectionDate, input.medicineSowId, input.doseMl, input.comment]);
-    res.status(201).json((await pool.query(sowInjectionSelect + ' WHERE i.id = $1', [inserted.rows[0].id])).rows[0]);
-  } catch (error) { handleDbError(error, res, next); }
+    const sowNumber = String(req.body.sow_number || '').trim();
+    const penId = Number(req.body.pen_id);
+    const medicineSowId = Number(req.body.medicine_sow_id);
+    const injectionDate = normalizeDate(req.body.injection_date, 'Injection date');
+    const weightKg = Number(req.body.weight_kg);
+    const comment = req.body.comment == null || req.body.comment === '' ? null : String(req.body.comment).trim();
+    const includeMelovem = req.body.include_melovem === true;
+    if (!sowNumber || sowNumber.length > 100) throw Object.assign(new Error('A valid sow number is required'), { status: 400 });
+    if (!Number.isInteger(penId) || penId < 1) throw Object.assign(new Error('A valid pen is required'), { status: 400 });
+    if (!Number.isInteger(medicineSowId) || medicineSowId < 1) throw Object.assign(new Error('A valid medicine is required'), { status: 400 });
+    if (!Number.isInteger(weightKg) || weightKg < 75 || weightKg > 500 || (weightKg - 75) % 25 !== 0) {
+      throw Object.assign(new Error('Weight must start at 75 kg and increase in 25 kg steps'), { status: 400 });
+    }
+
+    await client.query('BEGIN');
+    const pen = (await client.query('SELECT id FROM pens WHERE id=$1', [penId])).rows[0];
+    if (!pen) throw Object.assign(new Error('Pen not found'), { status: 404 });
+    const selected = (await client.query(
+      'SELECT id,name,dose_ml::float8 AS dose_ml,dose_kg::float8 AS dose_kg FROM medicine_sow WHERE id=$1',
+      [medicineSowId],
+    )).rows[0];
+    if (!selected) throw Object.assign(new Error('Medicine not found'), { status: 404 });
+    const medicines = [selected];
+    if (includeMelovem && selected.name.toLocaleLowerCase() !== 'melovem') {
+      const melovem = (await client.query(
+        `SELECT id,name,dose_ml::float8 AS dose_ml,dose_kg::float8 AS dose_kg
+         FROM medicine_sow WHERE lower(name)='melovem' LIMIT 1`,
+      )).rows[0];
+      if (!melovem) throw Object.assign(new Error('Melovem is not available in the medicine list'), { status: 409 });
+      medicines.push(melovem);
+    }
+    const created = [];
+    for (const medicine of medicines) {
+      if (!(medicine.dose_ml >= 0) || !(medicine.dose_kg > 0)) {
+        throw Object.assign(new Error(`Dose settings are invalid for ${medicine.name}`), { status: 409 });
+      }
+      const doseMl = Number((weightKg * medicine.dose_ml / medicine.dose_kg).toFixed(3));
+      const inserted = await client.query(`INSERT INTO planed_sow_injections
+        (sow_number,pen_id,injection_date,medicine_sow_id,dose_ml,comment)
+        VALUES($1,$2,$3,$4,$5,$6) RETURNING id`,
+        [sowNumber, penId, injectionDate, medicine.id, doseMl, comment]);
+      created.push({ id: inserted.rows[0].id, medicine_name: medicine.name, dose_ml: doseMl });
+    }
+    await client.query('COMMIT');
+    res.status(201).json({ plans: created, weight_kg: weightKg });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    handleDbError(error, res, next);
+  } finally {
+    client.release();
+  }
 });
 
 injectionPwa.post('/plans/:id/complete', requireAuth, async (req, res, next) => {

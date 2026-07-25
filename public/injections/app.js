@@ -110,15 +110,124 @@ $('#show-plan').addEventListener('click', async () => {
   showScreen('plan');
   $('#plan-error').textContent = '';
   try {
-    const { pens, medicines } = await loadReferences();
-    const form = $('#plan-form');
-    form.pen_id.innerHTML = pens.map(p => `<option value="${p.id}">${escapeHtml(p.department_name)} / ${escapeHtml(p.room_name)} / ${escapeHtml(p.name)}</option>`).join('');
-    form.medicine_sow_id.innerHTML = medicines.map(m => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
-    form.injection_date.value = localDate();
+    await preparePlanForm();
   } catch (error) {
     $('#plan-error').textContent = error.message;
   }
 });
+
+async function preparePlanForm() {
+  const { pens, medicines } = await loadReferences();
+  const form = $('#plan-form');
+  form.reset();
+  form.pen_id.value = '';
+  form.injection_date.value = localDate();
+  form.medicine_sow_id.innerHTML = '<option value="">Select medicine</option>' +
+    medicines.map(m => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
+  form.weight_kg.innerHTML = '<option value="">Select weight</option>' +
+    Array.from({ length: 14 }, (_, index) => 75 + index * 25)
+      .map(weight => `<option value="${weight}">${weight} kg</option>`).join('');
+  $('#pen-options').innerHTML = pens.map(p =>
+    `<option value="${escapeHtml(p.name)}">${escapeHtml(p.department_name)} / ${escapeHtml(p.room_name)}</option>`).join('');
+  $('#pen-input').value = '';
+  $('#pen-result').textContent = '';
+  $('#sow-history').hidden = true;
+  $('#sow-history').innerHTML = '';
+  for (const step of document.querySelectorAll('.step')) step.hidden = step.dataset.step !== '1';
+}
+
+function revealStep(number) {
+  const step = document.querySelector(`.step[data-step="${number}"]`);
+  step.hidden = false;
+  requestAnimationFrame(() => step.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+}
+
+$('#check-sow').addEventListener('click', async () => {
+  const sowNumber = $('#plan-form').sow_number.value.trim();
+  const history = $('#sow-history');
+  $('#plan-error').textContent = '';
+  if (!sowNumber) {
+    $('#plan-error').textContent = 'Enter a sow number.';
+    return;
+  }
+  $('#check-sow').disabled = true;
+  try {
+    const items = await api(`/api/injection-pwa/history?sow_number=${encodeURIComponent(sowNumber)}`);
+    history.hidden = false;
+    history.innerHTML = items.length
+      ? `<strong>${items.length} existing record${items.length === 1 ? '' : 's'}</strong>` + items.map(item => `
+          <div class="history-row">
+            <span class="status ${item.status}">${item.status}</span>
+            <span>${escapeHtml(item.injection_date)}</span>
+            <span>${escapeHtml(item.medicine_name)} · ${item.dose_ml} ml</span>
+          </div>`).join('')
+      : '<strong>No planned or completed injections found.</strong>';
+    revealStep(2);
+  } catch (error) {
+    $('#plan-error').textContent = error.message;
+  } finally {
+    $('#check-sow').disabled = false;
+  }
+});
+
+$('#check-pen').addEventListener('click', async () => {
+  const value = $('#pen-input').value.trim().toLocaleLowerCase();
+  const { pens } = await loadReferences();
+  const matches = pens.filter(p => p.name.trim().toLocaleLowerCase() === value);
+  $('#plan-form').pen_id.value = '';
+  if (!matches.length) {
+    $('#pen-result').textContent = 'Pen not found. Check the number and try again.';
+    $('#pen-result').classList.add('invalid');
+    return;
+  }
+  if (matches.length > 1) {
+    $('#pen-result').textContent = 'More than one pen has this number. Ask an administrator to make pen numbers unique.';
+    $('#pen-result').classList.add('invalid');
+    return;
+  }
+  const pen = matches[0];
+  $('#plan-form').pen_id.value = pen.id;
+  $('#pen-result').textContent = `Found: ${pen.department_name} / ${pen.room_name} / ${pen.name}`;
+  $('#pen-result').classList.remove('invalid');
+  revealStep(3);
+});
+
+$('#plan-form').medicine_sow_id.addEventListener('change', event => {
+  document.querySelector('.step[data-step="5"]').hidden = true;
+  if (event.target.value) revealStep(4);
+});
+
+$('#plan-form').weight_kg.addEventListener('change', event => {
+  if (!event.target.value) return;
+  updateDosePreview();
+  revealStep(5);
+});
+
+$('#plan-form').include_melovem.addEventListener('change', updateDosePreview);
+
+function updateDosePreview() {
+  const form = $('#plan-form');
+  const medicine = references.medicines.find(item => String(item.id) === form.medicine_sow_id.value);
+  const melovem = references.medicines.find(item => item.name.toLocaleLowerCase() === 'melovem');
+  const weight = Number(form.weight_kg.value);
+  if (!medicine || !weight) return;
+  const dose = calculateDose(medicine, weight);
+  const offerMelovem = medicine.name.toLocaleLowerCase() !== 'melovem';
+  $('#melovem-option').hidden = !offerMelovem;
+  const includeMelovem = offerMelovem && form.include_melovem.checked && melovem;
+  $('#dose-preview').innerHTML = `
+    <div><span>${escapeHtml(medicine.name)}</span><strong>${formatDose(dose)} ml</strong></div>
+    ${includeMelovem ? `<div><span>Melovem</span><strong>${formatDose(calculateDose(melovem, weight))} ml</strong></div>` : ''}`;
+}
+
+function calculateDose(medicine, weight) {
+  const doseKg = Number(medicine.dose_kg);
+  return doseKg > 0 ? weight * Number(medicine.dose_ml) / doseKg : 0;
+}
+
+function formatDose(value) {
+  return Number(value.toFixed(3)).toLocaleString(undefined, { maximumFractionDigits: 3 });
+}
 
 $('#plan-form').addEventListener('submit', async event => {
   event.preventDefault();
@@ -128,14 +237,14 @@ $('#plan-form').addEventListener('submit', async event => {
   const data = Object.fromEntries(new FormData(event.currentTarget));
   data.pen_id = Number(data.pen_id);
   data.medicine_sow_id = Number(data.medicine_sow_id);
-  data.dose_ml = Number(data.dose_ml);
+  data.weight_kg = Number(data.weight_kg);
+  data.include_melovem = data.include_melovem === 'on';
   data.comment = data.comment.trim() || null;
   try {
-    await api('/api/injection-pwa/plans', { method: 'POST', body: JSON.stringify(data) });
-    event.currentTarget.reset();
+    const result = await api('/api/injection-pwa/plans', { method: 'POST', body: JSON.stringify(data) });
     showScreen('home');
     await refreshTodayCount();
-    toast('Injection added to plan');
+    toast(`${result.plans.length} injection${result.plans.length === 1 ? '' : 's'} added to plan`);
   } catch (error) {
     $('#plan-error').textContent = error.message;
   } finally {
