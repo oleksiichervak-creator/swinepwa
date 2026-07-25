@@ -374,9 +374,33 @@ doneSowInjections.get('/week-report', requireAuth, async (req,res,next) => {
 });
 
 doneSowInjections.get('/week-report.xlsx', requireAuth, async (req,res,next) => {
-  try { const report=await buildDoneSowWeekReport(req.query.start_date); const workbook=new ExcelJS.Workbook(); const sheet=workbook.addWorksheet('Sow injections');
-    sheet.columns=[{header:'Date',key:'injection_date',width:14},{header:'Sow',key:'sow_number',width:16},{header:'Pen',key:'pen_name',width:18},{header:'Medicine',key:'medicine_name',width:24},{header:'Dose ml',key:'dose_ml',width:12},{header:'Given by',key:'given_by_username',width:18},{header:'Comment',key:'comment',width:30}];
-    sheet.addRows(report.items); sheet.getRow(1).font={bold:true}; res.set({'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Content-Disposition':`attachment; filename="done-sow-${report.start_date}.xlsx"`}); await workbook.xlsx.write(res); res.end();
+  try {
+    const report=await buildDoneSowWeekReport(req.query.start_date),workbook=new ExcelJS.Workbook(),sheet=workbook.addWorksheet('Week report');
+    sheet.columns=[{width:16},{width:16},{width:12},{width:24},{width:24},{width:22}];
+    sheet.pageSetup={paperSize:9,orientation:'portrait',fitToPage:false,scale:100,fitToWidth:1,fitToHeight:0,horizontalCentered:true,showGridLines:false,margins:{left:.3,right:.3,top:.5,bottom:.5,header:.2,footer:.2}};
+    sheet.mergeCells('A1:F1');sheet.getCell('A1').value='Dragte/Lobe/Polte week report';
+    sheet.mergeCells('A2:F2');sheet.getCell('A2').value=`Period: ${report.start_date} - ${report.end_date}`;
+    sheet.getCell('A1').font={name:'Calibri',size:16,bold:true};sheet.getCell('A1').alignment={horizontal:'center'};
+    sheet.getCell('A2').font={name:'Calibri',size:11,bold:true};sheet.getCell('A2').alignment={horizontal:'center'};
+    const headers=['First injection date','Sow number','Weight','Medicine','Diagnosis','Execution date/ml/by 1'];
+    sheet.addRow([]);sheet.addRow(headers);
+    const thinBorder={top:{style:'thin'},left:{style:'thin'},bottom:{style:'thin'},right:{style:'thin'}};
+    const headerFill={type:'pattern',pattern:'solid',fgColor:{argb:'FFEFEFEF'}};
+    sheet.getRow(4).eachCell(cell=>{cell.font={name:'Calibri',size:11,bold:true};cell.fill=headerFill;cell.border=thinBorder;cell.alignment={horizontal:'center',vertical:'middle',wrapText:true};});
+    for(const course of report.courses){
+      const first=course.injections[0],weight=inferredWeight(first.dose_ml,course.medicine_dose_ml,course.dose_kg);
+      const row=sheet.addRow([course.start_date,String(course.sow_number),weight,course.medicine_name,course.diagnosis,`${first.injection_date} - ${formatDose(first.dose_ml)} ml - ${first.given_by_username}\nInjection 1 of ${Math.max(1,Number(course.course_days)||1)}`]);
+      row.eachCell({includeEmpty:true},cell=>{cell.font={name:'Calibri',size:11};cell.border=thinBorder;cell.alignment={vertical:'top',wrapText:true};});
+    }
+    sheet.addRow([]);sheet.addRow([]);
+    const usageTitleRow=sheet.rowCount+1;sheet.mergeCells(`A${usageTitleRow}:B${usageTitleRow}`);sheet.getCell(`A${usageTitleRow}`).value='Medicine usage';
+    sheet.getCell(`A${usageTitleRow}`).font={name:'Calibri',size:16,bold:true};sheet.getCell(`A${usageTitleRow}`).alignment={horizontal:'center'};
+    const usageHeader=sheet.addRow(['Medicine','Total medicine ml']);
+    for(let column=1;column<=2;column++){const cell=usageHeader.getCell(column);cell.font={name:'Calibri',size:11,bold:true};cell.fill=headerFill;cell.border=thinBorder;cell.alignment={horizontal:'center'};}
+    for(const total of report.medicine_totals){const row=sheet.addRow([total.medicine_name,formatDose(total.total_dose_ml)]);for(let column=1;column<=2;column++){const cell=row.getCell(column);cell.font={name:'Calibri',size:11};cell.border=thinBorder;cell.alignment={vertical:'top',wrapText:true};}}
+    sheet.views=[{showGridLines:true}];
+    res.set({'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Content-Disposition':`attachment; filename="done-sow-${report.start_date}-${report.end_date}.xlsx"`});
+    await workbook.xlsx.write(res);res.end();
   } catch(error){ if(error.status)return res.status(error.status).json({error:error.message});next(error); }
 });
 
@@ -561,7 +585,8 @@ async function buildDoneSowWeekReport(start){
   const startDate=normalizeDate(start,'start_date'),end=new Date(`${startDate}T00:00:00Z`);end.setUTCDate(end.getUTCDate()+6);
   const endDate=end.toISOString().slice(0,10);
   const reportSelect=`SELECT i.sow_number,i.injection_date,i.medicine_sow_id,i.dose_ml::float8 AS dose_ml,i.comment,i.id,
-    m.name AS medicine_name,m.diagnosis,m.course_days,m.interval_hours,p.name AS pen_name,u.username AS given_by_username
+    m.name AS medicine_name,m.diagnosis,m.course_days,m.interval_hours,m.dose_ml::float8 AS medicine_dose_ml,
+    m.dose_kg::float8 AS dose_kg,p.name AS pen_name,u.username AS given_by_username
     FROM done_sow_injections i JOIN medicine_sow m ON m.id=i.medicine_sow_id
     JOIN pens p ON p.id=i.pen_id JOIN users u ON u.id=i.given_by_user_id`;
   const history=(await pool.query(reportSelect+' WHERE i.injection_date <= $1 ORDER BY i.sow_number,i.medicine_sow_id,i.injection_date,i.id',[endDate])).rows
@@ -593,6 +618,7 @@ async function buildDoneSowWeekReport(start){
 function isoWeekNumber(value){const date=new Date(`${value}T00:00:00Z`),day=date.getUTCDay()||7;date.setUTCDate(date.getUTCDate()+4-day);const yearStart=new Date(Date.UTC(date.getUTCFullYear(),0,1));return Math.ceil((((date-yearStart)/86400000)+1)/7);}
 function userInitials(value){const parts=String(value||'').trim().split(/[^\p{L}\p{N}]+/u).filter(Boolean);return parts.map(part=>part[0]).join('').toLocaleUpperCase().slice(0,3);}
 function formatDose(value){return Number(value).toLocaleString('en-GB',{maximumFractionDigits:3});}
+function inferredWeight(actualDose,medicineDose,medicineWeight){const dose=Number(medicineDose),weight=dose>0?Number(actualDose)*Number(medicineWeight)/dose:0;return Number(weight.toFixed(2));}
 function html(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function validateVetQuestion(b){const date=normalizeDate(b.question_date,'Question date'),question=typeof b.question==='string'?b.question.trim():'',photo=b.photo==null||b.photo===''?null:String(b.photo).trim();if(!question)throw Object.assign(new Error('Question is required'),{status:400});if(photo&&!/^\/uploads\/[a-f0-9-]+\.(jpg|png|webp)$/.test(photo))throw Object.assign(new Error('Invalid photo path'),{status:400});return{date,question,photo};}
 function validateDailyRemark(b){const date=normalizeDate(b.remark_date,'Remark date'),remark=typeof b.remark==='string'?b.remark.trim():'',photo=b.photo==null||b.photo===''?null:String(b.photo).trim();if(!remark)throw Object.assign(new Error('Remark is required'),{status:400});if(photo&&!/^\/uploads\/[a-f0-9-]+\.(jpg|png|webp)$/.test(photo))throw Object.assign(new Error('Invalid photo path'),{status:400});return{date,remark,photo};}
