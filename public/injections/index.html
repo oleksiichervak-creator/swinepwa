@@ -62,7 +62,7 @@
             <label>
               <input name="sow_number" required maxlength="100" inputmode="numeric" autocomplete="off" placeholder="Enter sow number">
             </label>
-            <button id="check-sow" class="step-button" type="button">Check history</button>
+            <p id="sow-check-status" class="check-status"></p>
             <div id="sow-history" class="history" hidden></div>
           </div>
 
@@ -73,7 +73,6 @@
               <datalist id="pen-options"></datalist>
               <input name="pen_id" type="hidden">
             </label>
-            <button id="check-pen" class="step-button" type="button">Check pen</button>
             <p id="pen-result" class="selection-result"></p>
           </div>
 
@@ -88,11 +87,8 @@
 
           <div class="step" data-step="4" hidden>
             <div class="step-heading"><span>4</span><strong>Weight</strong></div>
-            <label>
-              <select name="weight_kg" required>
-                <option value="">Select weight</option>
-              </select>
-            </label>
+            <input name="weight_kg" type="hidden">
+            <div id="weight-grid" class="weight-grid" role="group" aria-label="Select weight"></div>
           </div>
 
           <div class="step" data-step="5" hidden>

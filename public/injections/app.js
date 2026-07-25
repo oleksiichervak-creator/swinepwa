@@ -124,13 +124,15 @@ async function preparePlanForm() {
   form.injection_date.value = localDate();
   form.medicine_sow_id.innerHTML = '<option value="">Select medicine</option>' +
     medicines.map(m => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
-  form.weight_kg.innerHTML = '<option value="">Select weight</option>' +
-    Array.from({ length: 14 }, (_, index) => 75 + index * 25)
-      .map(weight => `<option value="${weight}">${weight} kg</option>`).join('');
+  form.weight_kg.value = '';
+  $('#weight-grid').innerHTML = Array.from({ length: 14 }, (_, index) => 75 + index * 25)
+    .map(weight => `<button class="weight-button" type="button" data-weight="${weight}">${weight}<small>kg</small></button>`).join('');
+  document.querySelectorAll('[data-weight]').forEach(button => button.addEventListener('click', () => selectWeight(button)));
   $('#pen-options').innerHTML = pens.map(p =>
     `<option value="${escapeHtml(p.name)}">${escapeHtml(p.department_name)} / ${escapeHtml(p.room_name)}</option>`).join('');
   $('#pen-input').value = '';
   $('#pen-result').textContent = '';
+  $('#sow-check-status').textContent = '';
   $('#sow-history').hidden = true;
   $('#sow-history').innerHTML = '';
   for (const step of document.querySelectorAll('.step')) step.hidden = step.dataset.step !== '1';
@@ -142,17 +144,33 @@ function revealStep(number) {
   requestAnimationFrame(() => step.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
 }
 
-$('#check-sow').addEventListener('click', async () => {
-  const sowNumber = $('#plan-form').sow_number.value.trim();
-  const history = $('#sow-history');
-  $('#plan-error').textContent = '';
-  if (!sowNumber) {
-    $('#plan-error').textContent = 'Enter a sow number.';
-    return;
+function hideStepsFrom(number) {
+  for (const step of document.querySelectorAll('.step')) {
+    if (Number(step.dataset.step) >= number) step.hidden = true;
   }
-  $('#check-sow').disabled = true;
+}
+
+let sowCheckTimer;
+let sowCheckSequence = 0;
+$('#plan-form').sow_number.addEventListener('input', () => {
+  clearTimeout(sowCheckTimer);
+  hideStepsFrom(2);
+  $('#sow-history').hidden = true;
+  $('#sow-check-status').textContent = '';
+  const sowNumber = $('#plan-form').sow_number.value.trim();
+  if (!sowNumber) return;
+  $('#sow-check-status').textContent = 'Checking history…';
+  sowCheckTimer = setTimeout(() => checkSowHistory(sowNumber), 450);
+});
+
+async function checkSowHistory(sowNumber) {
+  const history = $('#sow-history');
+  const sequence = ++sowCheckSequence;
+  $('#plan-error').textContent = '';
   try {
     const items = await api(`/api/injection-pwa/history?sow_number=${encodeURIComponent(sowNumber)}`);
+    if (sequence !== sowCheckSequence || $('#plan-form').sow_number.value.trim() !== sowNumber) return;
+    $('#sow-check-status').textContent = 'History checked';
     history.hidden = false;
     history.innerHTML = items.length
       ? `<strong>${items.length} existing record${items.length === 1 ? '' : 's'}</strong>` + items.map(item => `
@@ -164,14 +182,27 @@ $('#check-sow').addEventListener('click', async () => {
       : '<strong>No planned or completed injections found.</strong>';
     revealStep(2);
   } catch (error) {
+    $('#sow-check-status').textContent = '';
     $('#plan-error').textContent = error.message;
-  } finally {
-    $('#check-sow').disabled = false;
   }
+}
+
+let penCheckTimer;
+$('#pen-input').addEventListener('input', () => {
+  clearTimeout(penCheckTimer);
+  $('#plan-form').pen_id.value = '';
+  $('#pen-result').textContent = 'Checking pen…';
+  $('#pen-result').classList.remove('invalid');
+  hideStepsFrom(3);
+  penCheckTimer = setTimeout(validatePenInput, 250);
 });
 
-$('#check-pen').addEventListener('click', async () => {
+async function validatePenInput() {
   const value = $('#pen-input').value.trim().toLocaleLowerCase();
+  if (!value) {
+    $('#pen-result').textContent = '';
+    return;
+  }
   const { pens } = await loadReferences();
   const matches = pens.filter(p => p.name.trim().toLocaleLowerCase() === value);
   $('#plan-form').pen_id.value = '';
@@ -190,18 +221,19 @@ $('#check-pen').addEventListener('click', async () => {
   $('#pen-result').textContent = `Found: ${pen.department_name} / ${pen.room_name} / ${pen.name}`;
   $('#pen-result').classList.remove('invalid');
   revealStep(3);
-});
+}
 
 $('#plan-form').medicine_sow_id.addEventListener('change', event => {
   document.querySelector('.step[data-step="5"]').hidden = true;
   if (event.target.value) revealStep(4);
 });
 
-$('#plan-form').weight_kg.addEventListener('change', event => {
-  if (!event.target.value) return;
+function selectWeight(button) {
+  document.querySelectorAll('[data-weight]').forEach(item => item.classList.toggle('selected', item === button));
+  $('#plan-form').weight_kg.value = button.dataset.weight;
   updateDosePreview();
   revealStep(5);
-});
+}
 
 $('#plan-form').include_melovem.addEventListener('change', updateDosePreview);
 
