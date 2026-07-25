@@ -584,7 +584,9 @@ async function buildDoneSowWeekReport(start){
     start_date:startDate,end_date:endDate,week_number:isoWeekNumber(startDate),
     total_injections:weekItems.length,total_dose_ml:weekItems.reduce((sum,x)=>sum+Number(x.dose_ml),0),
     items:weekItems,
-    courses:courses.filter(x=>x.start_date>=startDate).map(x=>({...x,given_by_initials:[0,1,2].map(index=>userInitials(x.injections[index]?.given_by_username))})),
+    courses:courses.filter(x=>x.start_date>=startDate)
+      .map(x=>({...x,given_by_initials:[0,1,2].map(index=>userInitials(x.injections[index]?.given_by_username))}))
+      .sort((a,b)=>a.start_date.localeCompare(b.start_date)||String(a.sow_number).localeCompare(String(b.sow_number),undefined,{numeric:true})),
     medicine_totals:[...medicineTotals].map(([medicine_name,total_dose_ml])=>({medicine_name,total_dose_ml})).sort((a,b)=>a.medicine_name.localeCompare(b.medicine_name))
   };
 }
