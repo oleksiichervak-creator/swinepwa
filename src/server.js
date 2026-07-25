@@ -381,8 +381,11 @@ doneSowInjections.get('/week-report.xlsx', requireAuth, async (req,res,next) => 
 });
 
 doneSowInjections.get('/week-report-print', requireAuth, async (req,res,next) => {
-  try { const r=await buildDoneSowWeekReport(req.query.start_date); const rows=r.items.map(x=>`<tr><td>${html(x.injection_date)}</td><td>${html(x.sow_number)}</td><td>${html(x.pen_name)}</td><td>${html(x.medicine_name)}</td><td>${x.dose_ml}</td><td>${html(x.given_by_username)}</td><td>${html(x.comment||'')}</td></tr>`).join('');
-    res.type('html').send(`<!doctype html><html><head><title>Done sow injections</title><style>body{font:14px Arial;margin:30px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #aaa;padding:8px;text-align:left}@media print{button{display:none}}</style></head><body><button onclick="print()">Print</button><h1>Done sow injections</h1><p>${r.start_date} — ${r.end_date} · ${r.total_injections} injections · ${r.total_dose_ml} ml</p><table><thead><tr><th>Date</th><th>Sow</th><th>Pen</th><th>Medicine</th><th>Dose ml</th><th>Given by</th><th>Comment</th></tr></thead><tbody>${rows}</tbody></table></body></html>`);
+  try {
+    const r=await buildDoneSowWeekReport(req.query.start_date);
+    const rows=r.courses.map(x=>`<tr><td>${html(x.start_date)}</td><td>${html(x.sow_number)}</td><td>${html(x.diagnosis)}</td><td>${html(x.medicine_name)}</td><td class="number">${formatDose(x.dose_ml)}</td>${x.given_by_initials.map(value=>`<td class="initials">${html(value||'—')}</td>`).join('')}</tr>`).join('');
+    const totals=r.medicine_totals.map(x=>`<tr><td>${html(x.medicine_name)}</td><td class="number">${formatDose(x.total_dose_ml)} ml</td></tr>`).join('');
+    res.type('html').send(`<!doctype html><html><head><meta charset="utf-8"><title>Week ${r.week_number} sow treatment report</title><style>@page{size:landscape;margin:14mm}*{box-sizing:border-box}body{font:13px Arial,sans-serif;color:#111;margin:24px}.print-button{margin-bottom:16px;padding:7px 14px}h1{font-size:19px;text-align:center;margin:0 0 4px}.period{text-align:center;margin:0 0 18px;font-weight:bold}.report{width:100%;border-collapse:collapse;table-layout:fixed}.report th,.report td{border:1px solid #333;padding:6px 7px;text-align:left;vertical-align:middle}.report th{background:#e8e8e8;font-size:11px;text-transform:uppercase}.report th:nth-child(1){width:11%}.report th:nth-child(2){width:12%}.report th:nth-child(3){width:21%}.report th:nth-child(4){width:21%}.report th:nth-child(5){width:10%}.report th:nth-child(n+6){width:8.33%;text-align:center}.number{text-align:right!important}.initials{text-align:center!important;font-weight:bold}.empty{text-align:center!important;color:#555;padding:18px!important}.summary{width:390px;border-collapse:collapse;margin-top:24px}.summary caption{text-align:left;font-weight:bold;font-size:14px;margin-bottom:6px}.summary th,.summary td{border:1px solid #555;padding:5px 7px}.summary th{background:#eee;text-align:left}@media print{body{margin:0}.print-button{display:none}thead{display:table-header-group}}</style></head><body><button class="print-button" onclick="print()">Print</button><h1>Done sow injections — week ${r.week_number}</h1><p class="period">${html(r.start_date)} — ${html(r.end_date)}</p><table class="report"><thead><tr><th>Date</th><th>Sow number</th><th>Diagnosis</th><th>Medicine</th><th>Dose ml</th><th>Given 1</th><th>Given 2</th><th>Given 3</th></tr></thead><tbody>${rows||'<tr><td class="empty" colspan="8">No treatment courses started in this period.</td></tr>'}</tbody></table><table class="summary"><caption>Medicine used during the week</caption><thead><tr><th>Medicine</th><th>Total used</th></tr></thead><tbody>${totals||'<tr><td colspan="2">No medicine used.</td></tr>'}</tbody></table></body></html>`);
   } catch(error){ if(error.status)return res.status(error.status).json({error:error.message});next(error); }
 });
 
@@ -554,7 +557,39 @@ function normalizeDate(value, label='Date') { const date=value instanceof Date?v
 function validateDoneSow(b){const x={sowNumber:typeof b.sow_number==='string'?b.sow_number.trim():'',penId:Number(b.pen_id),injectionDate:normalizeDate(b.injection_date,'Injection date'),medicineSowId:Number(b.medicine_sow_id),doseMl:Number(b.dose_ml),givenByUserId:Number(b.given_by_user_id),comment:b.comment==null||b.comment===''?null:String(b.comment).trim()};if(!x.sowNumber||x.sowNumber.length>100)throw Object.assign(new Error('Sow number is required and must not exceed 100 characters'),{status:400});for(const [v,l] of [[x.penId,'pen'],[x.medicineSowId,'sow medicine'],[x.givenByUserId,'user']])if(!Number.isInteger(v)||v<1)throw Object.assign(new Error(`A valid ${l} is required`),{status:400});if(!Number.isFinite(x.doseMl)||x.doseMl<0)throw Object.assign(new Error('Dose must be zero or greater'),{status:400});return x;}
 function doneSowValues(x){return[x.sowNumber,x.penId,x.injectionDate,x.medicineSowId,x.doseMl,x.givenByUserId,x.comment];}
 function doneSowFilters(q){const clauses=[],values=[];const add=(sql,v)=>{values.push(v);clauses.push(sql.replace('?',`$${values.length}`));};if(q.sow_number)add('i.sow_number=?',String(q.sow_number));for(const [key,col] of [['pen_id','i.pen_id'],['medicine_sow_id','i.medicine_sow_id'],['given_by_user_id','i.given_by_user_id']])if(q[key]!==undefined){const v=Number(q[key]);if(!Number.isInteger(v)||v<1)throw Object.assign(new Error(`${key} must be a positive integer`),{status:400});add(`${col}=?`,v);}if(q.date_from)add('i.injection_date>=?',normalizeDate(q.date_from,'date_from'));if(q.date_to)add('i.injection_date<=?',normalizeDate(q.date_to,'date_to'));return{where:clauses.length?' WHERE '+clauses.join(' AND '):'',values};}
-async function buildDoneSowWeekReport(start){const startDate=normalizeDate(start,'start_date');const end=new Date(`${startDate}T00:00:00Z`);end.setUTCDate(end.getUTCDate()+6);const endDate=end.toISOString().slice(0,10);const items=(await pool.query(doneSowSelect+' WHERE i.injection_date BETWEEN $1 AND $2 ORDER BY i.injection_date,i.id',[startDate,endDate])).rows;return{start_date:startDate,end_date:endDate,total_injections:items.length,total_dose_ml:items.reduce((sum,x)=>sum+x.dose_ml,0),items};}
+async function buildDoneSowWeekReport(start){
+  const startDate=normalizeDate(start,'start_date'),end=new Date(`${startDate}T00:00:00Z`);end.setUTCDate(end.getUTCDate()+6);
+  const endDate=end.toISOString().slice(0,10);
+  const reportSelect=`SELECT i.sow_number,i.injection_date,i.medicine_sow_id,i.dose_ml::float8 AS dose_ml,i.comment,i.id,
+    m.name AS medicine_name,m.diagnosis,m.course_days,m.interval_hours,p.name AS pen_name,u.username AS given_by_username
+    FROM done_sow_injections i JOIN medicine_sow m ON m.id=i.medicine_sow_id
+    JOIN pens p ON p.id=i.pen_id JOIN users u ON u.id=i.given_by_user_id`;
+  const history=(await pool.query(reportSelect+' WHERE i.injection_date <= $1 ORDER BY i.sow_number,i.medicine_sow_id,i.injection_date,i.id',[endDate])).rows;
+  const courses=[];
+  for(const injection of history){
+    const previous=courses[courses.length-1],sameCourse=previous&&previous.sow_number===injection.sow_number&&String(previous.medicine_sow_id)===String(injection.medicine_sow_id)&&injection.injection_date<=previous.course_end;
+    if(sameCourse){previous.injections.push(injection);continue;}
+    const courseEnd=new Date(`${injection.injection_date}T00:00:00Z`);
+    courseEnd.setUTCDate(courseEnd.getUTCDate()+Math.max(0,Number(injection.course_days)-1));
+    courses.push({...injection,start_date:injection.injection_date,course_end:courseEnd.toISOString().slice(0,10),injections:[injection]});
+  }
+  const weekItems=history.filter(x=>x.injection_date>=startDate);
+  const medicineTotals=new Map();
+  for(const item of weekItems){
+    const total=medicineTotals.get(item.medicine_name)||0;
+    medicineTotals.set(item.medicine_name,total+Number(item.dose_ml));
+  }
+  return{
+    start_date:startDate,end_date:endDate,week_number:isoWeekNumber(startDate),
+    total_injections:weekItems.length,total_dose_ml:weekItems.reduce((sum,x)=>sum+Number(x.dose_ml),0),
+    items:weekItems,
+    courses:courses.filter(x=>x.start_date>=startDate).map(x=>({...x,given_by_initials:[0,1,2].map(index=>userInitials(x.injections[index]?.given_by_username))})),
+    medicine_totals:[...medicineTotals].map(([medicine_name,total_dose_ml])=>({medicine_name,total_dose_ml})).sort((a,b)=>a.medicine_name.localeCompare(b.medicine_name))
+  };
+}
+function isoWeekNumber(value){const date=new Date(`${value}T00:00:00Z`),day=date.getUTCDay()||7;date.setUTCDate(date.getUTCDate()+4-day);const yearStart=new Date(Date.UTC(date.getUTCFullYear(),0,1));return Math.ceil((((date-yearStart)/86400000)+1)/7);}
+function userInitials(value){const parts=String(value||'').trim().split(/[^\p{L}\p{N}]+/u).filter(Boolean);return parts.map(part=>part[0]).join('').toLocaleUpperCase().slice(0,3);}
+function formatDose(value){return Number(value).toLocaleString('en-GB',{maximumFractionDigits:3});}
 function html(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function validateVetQuestion(b){const date=normalizeDate(b.question_date,'Question date'),question=typeof b.question==='string'?b.question.trim():'',photo=b.photo==null||b.photo===''?null:String(b.photo).trim();if(!question)throw Object.assign(new Error('Question is required'),{status:400});if(photo&&!/^\/uploads\/[a-f0-9-]+\.(jpg|png|webp)$/.test(photo))throw Object.assign(new Error('Invalid photo path'),{status:400});return{date,question,photo};}
 function validateDailyRemark(b){const date=normalizeDate(b.remark_date,'Remark date'),remark=typeof b.remark==='string'?b.remark.trim():'',photo=b.photo==null||b.photo===''?null:String(b.photo).trim();if(!remark)throw Object.assign(new Error('Remark is required'),{status:400});if(photo&&!/^\/uploads\/[a-f0-9-]+\.(jpg|png|webp)$/.test(photo))throw Object.assign(new Error('Invalid photo path'),{status:400});return{date,remark,photo};}
