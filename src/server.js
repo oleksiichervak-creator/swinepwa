@@ -31,6 +31,12 @@ app.post('/api/auth/login', async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
+app.get('/api/auth/users', async (_req, res, next) => {
+  try {
+    res.json((await pool.query('SELECT username FROM users ORDER BY lower(username), id')).rows);
+  } catch (error) { next(error); }
+});
+
 app.get('/api/auth/me', requireAuth, async (req, res, next) => {
   try {
     const result = await pool.query(userSelect + ' WHERE id = $1', [req.user.sub]);
@@ -519,6 +525,65 @@ sowInjections.delete('/:id', requireAuth, requireAdmin, async (req, res, next) =
 
 app.use('/api/planed-sow-injections', sowInjections);
 app.use('/planed-sow-injections', sowInjections);
+
+const injectionPwa = express.Router();
+
+injectionPwa.get('/today', requireAuth, async (req, res, next) => {
+  try {
+    const date = normalizeDate(req.query.date || new Date(), 'date');
+    res.json((await pool.query(sowInjectionSelect + ' WHERE i.injection_date = $1 ORDER BY i.id', [date])).rows);
+  } catch (error) {
+    if (error.status) return res.status(error.status).json({ error: error.message });
+    next(error);
+  }
+});
+
+injectionPwa.post('/plans', requireAuth, async (req, res, next) => {
+  try {
+    const input = validateSowInjection(req.body);
+    const inserted = await pool.query(`INSERT INTO planed_sow_injections
+      (sow_number, pen_id, injection_date, medicine_sow_id, dose_ml, comment)
+      VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+      [input.sowNumber, input.penId, input.injectionDate, input.medicineSowId, input.doseMl, input.comment]);
+    res.status(201).json((await pool.query(sowInjectionSelect + ' WHERE i.id = $1', [inserted.rows[0].id])).rows[0]);
+  } catch (error) { handleDbError(error, res, next); }
+});
+
+injectionPwa.post('/plans/:id/complete', requireAuth, async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const planned = (await client.query(
+      `SELECT sow_number, pen_id, injection_date, medicine_sow_id, dose_ml, comment
+       FROM planed_sow_injections WHERE id = $1 FOR UPDATE`,
+      [req.params.id],
+    )).rows[0];
+    if (!planned) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Planned sow injection not found' });
+    }
+    const completed = validateDoneSow({
+      ...planned,
+      injection_date: req.body.injection_date || planned.injection_date,
+      dose_ml: Object.hasOwn(req.body, 'dose_ml') ? req.body.dose_ml : planned.dose_ml,
+      comment: Object.hasOwn(req.body, 'comment') ? req.body.comment : planned.comment,
+      given_by_user_id: req.user.sub,
+    });
+    const inserted = await client.query(`INSERT INTO done_sow_injections
+      (sow_number,pen_id,injection_date,medicine_sow_id,dose_ml,given_by_user_id,comment)
+      VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id`, doneSowValues(completed));
+    await client.query('DELETE FROM planed_sow_injections WHERE id = $1', [req.params.id]);
+    await client.query('COMMIT');
+    res.status(201).json((await pool.query(doneSowSelect + ' WHERE i.id = $1', [inserted.rows[0].id])).rows[0]);
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    handleDbError(error, res, next);
+  } finally {
+    client.release();
+  }
+});
+
+app.use('/api/injection-pwa', injectionPwa);
 
 function validateDepartmentName(value) {
   const name = typeof value === 'string' ? value.trim() : '';

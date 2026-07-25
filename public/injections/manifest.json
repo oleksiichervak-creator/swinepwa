@@ -1,0 +1,19 @@
+{
+  "id": "/injections/",
+  "name": "Sow Injections",
+  "short_name": "Injections",
+  "description": "Plan and register sow injections",
+  "start_url": "/injections/",
+  "scope": "/injections/",
+  "display": "standalone",
+  "background_color": "#eef3ef",
+  "theme_color": "#245c43",
+  "icons": [
+    {
+      "src": "/injections/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

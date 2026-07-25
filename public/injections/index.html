@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#245c43">
+  <meta name="description" content="Plan and register sow injections">
+  <link rel="manifest" href="/injections/manifest.json">
+  <link rel="icon" href="/injections/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/injections/styles.css">
+  <title>Sow Injections</title>
+</head>
+<body>
+  <main>
+    <section id="login-view" class="view login-view">
+      <div class="brand" aria-hidden="true">SI</div>
+      <p class="eyebrow">SWINE FARM</p>
+      <h1>Sow Injections</h1>
+      <p class="intro">Sign in to plan and register treatments.</p>
+      <form id="login-form" class="panel">
+        <label>User
+          <select id="login-user" required>
+            <option value="">Loading users…</option>
+          </select>
+        </label>
+        <label>Password
+          <input id="login-password" type="password" required autocomplete="current-password">
+        </label>
+        <p id="login-error" class="error" role="alert"></p>
+        <button type="submit">Sign in</button>
+      </form>
+    </section>
+
+    <section id="app-view" class="view" hidden>
+      <header>
+        <button id="back-button" class="icon-button" type="button" aria-label="Back" hidden>←</button>
+        <div>
+          <p class="eyebrow">SOW INJECTIONS</p>
+          <h1 id="screen-title">Today</h1>
+        </div>
+        <button id="logout-button" class="text-button" type="button">Sign out</button>
+      </header>
+
+      <section id="home-screen" class="screen">
+        <p class="welcome">Signed in as <strong id="current-user"></strong></p>
+        <div class="choice-grid">
+          <button id="show-plan" class="choice-card" type="button">
+            <span class="choice-icon">＋</span>
+            <span><strong>Add to plan</strong><small>Schedule a new sow injection</small></span>
+          </button>
+          <button id="show-today" class="choice-card accent" type="button">
+            <span id="today-count" class="choice-count">—</span>
+            <span><strong>Injections for today</strong><small>Register completed injections</small></span>
+          </button>
+        </div>
+      </section>
+
+      <section id="plan-screen" class="screen" hidden>
+        <form id="plan-form" class="panel form-panel">
+          <label>Sow number
+            <input name="sow_number" required maxlength="100" inputmode="numeric" autocomplete="off">
+          </label>
+          <label>Pen
+            <select name="pen_id" required></select>
+          </label>
+          <label>Date
+            <input name="injection_date" type="date" required>
+          </label>
+          <label>Medicine
+            <select name="medicine_sow_id" required></select>
+          </label>
+          <label>Dose (ml)
+            <input name="dose_ml" type="number" min="0" step="0.001" required inputmode="decimal">
+          </label>
+          <label>Comment
+            <textarea name="comment" rows="3"></textarea>
+          </label>
+          <p id="plan-error" class="error" role="alert"></p>
+          <button type="submit">Add to plan</button>
+        </form>
+      </section>
+
+      <section id="today-screen" class="screen" hidden>
+        <div class="date-row">
+          <label>Date<input id="today-date" type="date"></label>
+          <button id="refresh-today" class="secondary" type="button">Refresh</button>
+        </div>
+        <div id="today-list" class="injection-list" aria-live="polite"></div>
+      </section>
+    </section>
+  </main>
+
+  <dialog id="complete-dialog">
+    <form id="complete-form">
+      <button id="complete-close" class="dialog-close" type="button" aria-label="Close">×</button>
+      <p class="eyebrow">REGISTER INJECTION</p>
+      <h2 id="complete-title"></h2>
+      <dl id="complete-details"></dl>
+      <input name="id" type="hidden">
+      <label>Completed on
+        <input name="injection_date" type="date" required>
+      </label>
+      <label>Dose (ml)
+        <input name="dose_ml" type="number" min="0" step="0.001" required inputmode="decimal">
+      </label>
+      <label>Comment
+        <textarea name="comment" rows="3"></textarea>
+      </label>
+      <p id="complete-error" class="error" role="alert"></p>
+      <button type="submit">Confirm injection</button>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="/injections/app.js" type="module"></script>
+</body>
+</html>
