@@ -78,9 +78,8 @@ async function enterApp() {
   $('#login-view').hidden = true;
   $('#app-view').hidden = false;
   $('#current-user').textContent = currentUser.username;
-  $('#today-date').value = localDate();
+  setTodayDateLabel();
   showScreen('home');
-  await refreshTodayCount();
 }
 
 function signOut() {
@@ -96,7 +95,14 @@ function signOut() {
 function showScreen(name) {
   for (const screen of ['home', 'plan', 'today']) $(`#${screen}-screen`).hidden = screen !== name;
   $('#back-button').hidden = name === 'home';
-  $('#screen-title').textContent = { home: 'Today', plan: 'Add to plan', today: 'Injections for today' }[name];
+  $('#screen-title').textContent = name === 'home' ? 'Injections for today' : '';
+  $('#logout-button').hidden = name !== 'home';
+}
+
+function setTodayDateLabel() {
+  $('#today-date-label').textContent = new Intl.DateTimeFormat('en-GB', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  }).format(new Date());
 }
 
 async function loadReferences() {
@@ -275,7 +281,6 @@ $('#plan-form').addEventListener('submit', async event => {
   try {
     const result = await api('/api/injection-pwa/plans', { method: 'POST', body: JSON.stringify(data) });
     showScreen('home');
-    await refreshTodayCount();
     toast(`${result.plans.length} injection${result.plans.length === 1 ? '' : 's'} added to plan`);
   } catch (error) {
     $('#plan-error').textContent = error.message;
@@ -288,29 +293,67 @@ async function loadToday() {
   const list = $('#today-list');
   list.innerHTML = '<div class="empty">Loading…</div>';
   try {
-    todayItems = await api(`/api/injection-pwa/today?date=${encodeURIComponent($('#today-date').value)}`);
-    $('#today-count').textContent = todayItems.length;
+    todayItems = await api(`/api/injection-pwa/today?date=${localDate()}`);
+    todayItems.sort(comparePens);
+    renderMedicineSummary();
     list.innerHTML = todayItems.length ? todayItems.map(item => `
       <article class="injection-card">
         <header><h2>Sow ${escapeHtml(item.sow_number)}</h2><strong>${escapeHtml(item.pen_name)}</strong></header>
         <div class="medicine">${escapeHtml(item.medicine_name)}</div>
         <div class="meta"><span>Dose: <strong>${item.dose_ml} ml</strong></span><span>${escapeHtml(item.comment || 'No comment')}</span></div>
-        <button class="complete-button" data-complete="${item.id}" type="button">Register as done</button>
+        <div class="card-actions">
+          <button class="skip-button" data-skip="${item.id}" type="button">Skip</button>
+          <button class="complete-button" data-complete="${item.id}" type="button">Register as done</button>
+        </div>
       </article>`).join('') : '<div class="empty">No planned injections for this date.</div>';
     list.querySelectorAll('[data-complete]').forEach(button => {
       button.addEventListener('click', () => openComplete(todayItems.find(item => String(item.id) === button.dataset.complete)));
     });
+    list.querySelectorAll('[data-skip]').forEach(button => {
+      button.addEventListener('click', () => skipInjection(button.dataset.skip, button));
+    });
   } catch (error) {
+    $('#medicine-summary').innerHTML = '';
     list.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
   }
 }
 
-async function refreshTodayCount() {
+function comparePens(left, right) {
+  const a = String(left.pen_name).trim();
+  const b = String(right.pen_name).trim();
+  const aDotted = a.includes('.');
+  const bDotted = b.includes('.');
+  if (aDotted !== bDotted) return aDotted ? 1 : -1;
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+}
+
+function renderMedicineSummary() {
+  const medicines = new Map();
+  for (const item of todayItems) {
+    const current = medicines.get(item.medicine_name) || { count: 0, dose: 0 };
+    current.count += 1;
+    current.dose += Number(item.dose_ml);
+    medicines.set(item.medicine_name, current);
+  }
+  $('#medicine-summary').innerHTML = medicines.size ? `
+    <h2>Medicine totals</h2>
+    <div class="summary-table">
+      ${[...medicines].sort(([a], [b]) => a.localeCompare(b)).map(([name, total]) => `
+        <div><strong>${escapeHtml(name)}</strong><span>${total.count} injection${total.count === 1 ? '' : 's'}</span><b>${formatDose(total.dose)} ml</b></div>
+      `).join('')}
+    </div>` : '';
+}
+
+async function skipInjection(id, button) {
+  if (!confirm('Skip this planned injection? It will not be added to done injections.')) return;
+  button.disabled = true;
   try {
-    const items = await api(`/api/injection-pwa/today?date=${localDate()}`);
-    $('#today-count').textContent = items.length;
-  } catch {
-    $('#today-count').textContent = '!';
+    await api(`/api/injection-pwa/plans/${id}/skip`, { method: 'DELETE' });
+    await loadToday();
+    toast('Planned injection skipped');
+  } catch (error) {
+    button.disabled = false;
+    toast(error.message);
   }
 }
 
@@ -318,7 +361,7 @@ function openComplete(item) {
   const form = $('#complete-form');
   form.reset();
   form.id.value = item.id;
-  form.injection_date.value = $('#today-date').value;
+  form.injection_date.value = localDate();
   form.dose_ml.value = item.dose_ml;
   form.comment.value = item.comment || '';
   $('#complete-title').textContent = `Sow ${item.sow_number}`;
@@ -350,8 +393,6 @@ $('#complete-form').addEventListener('submit', async event => {
 });
 
 $('#show-today').addEventListener('click', () => { showScreen('today'); loadToday(); });
-$('#refresh-today').addEventListener('click', loadToday);
-$('#today-date').addEventListener('change', loadToday);
 $('#back-button').addEventListener('click', () => showScreen('home'));
 $('#logout-button').addEventListener('click', signOut);
 $('#complete-close').addEventListener('click', () => $('#complete-dialog').close());

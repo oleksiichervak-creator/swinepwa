@@ -35,8 +35,7 @@
       <header>
         <button id="back-button" class="icon-button" type="button" aria-label="Back" hidden>←</button>
         <div>
-          <p class="eyebrow">SOW INJECTIONS</p>
-          <h1 id="screen-title">Today</h1>
+          <h1 id="screen-title">Injections for today</h1>
         </div>
         <button id="logout-button" class="text-button" type="button">Sign out</button>
       </header>
@@ -49,7 +48,7 @@
             <span><strong>Add to plan</strong><small>Schedule a new sow injection</small></span>
           </button>
           <button id="show-today" class="choice-card accent" type="button">
-            <span id="today-count" class="choice-count">—</span>
+            <span class="choice-icon today-icon" aria-hidden="true">&#128137;</span>
             <span><strong>Injections for today</strong><small>Register completed injections</small></span>
           </button>
         </div>
@@ -111,10 +110,8 @@
       </section>
 
       <section id="today-screen" class="screen" hidden>
-        <div class="date-row">
-          <label>Date<input id="today-date" type="date"></label>
-          <button id="refresh-today" class="secondary" type="button">Refresh</button>
-        </div>
+        <p id="today-date-label" class="today-date-label"></p>
+        <div id="medicine-summary" class="medicine-summary" aria-live="polite"></div>
         <div id="today-list" class="injection-list" aria-live="polite"></div>
       </section>
     </section>

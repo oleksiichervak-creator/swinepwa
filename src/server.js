@@ -649,6 +649,14 @@ injectionPwa.post('/plans/:id/complete', requireAuth, async (req, res, next) => 
   }
 });
 
+injectionPwa.delete('/plans/:id/skip', requireAuth, async (req, res, next) => {
+  try {
+    const result = await pool.query('DELETE FROM planed_sow_injections WHERE id = $1 RETURNING id', [req.params.id]);
+    if (!result.rows[0]) return res.status(404).json({ error: 'Planned sow injection not found' });
+    res.status(204).end();
+  } catch (error) { next(error); }
+});
+
 app.use('/api/injection-pwa', injectionPwa);
 
 function validateDepartmentName(value) {
