@@ -95,7 +95,7 @@ function signOut() {
 function showScreen(name) {
   for (const screen of ['home', 'plan', 'today']) $(`#${screen}-screen`).hidden = screen !== name;
   $('#back-button').hidden = name === 'home';
-  $('#screen-title').textContent = name === 'home' ? 'Injections for today' : '';
+  $('#screen-title').textContent = '';
   $('#logout-button').hidden = name !== 'home';
 }
 
