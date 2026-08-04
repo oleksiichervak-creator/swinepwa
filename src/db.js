@@ -172,6 +172,16 @@ export async function initializeDatabase() {
     )
   `);
 
+  await pool.query(`ALTER TABLE done_sow_injections ADD COLUMN IF NOT EXISTS source_system VARCHAR(50)`);
+  await pool.query(`ALTER TABLE done_sow_injections ADD COLUMN IF NOT EXISTS source_record_id BIGINT`);
+  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS done_sow_source_record_uq
+    ON done_sow_injections(source_system, source_record_id) WHERE source_system IS NOT NULL`);
+
+  await pool.query(`ALTER TABLE planed_sow_injections ADD COLUMN IF NOT EXISTS source_system VARCHAR(50)`);
+  await pool.query(`ALTER TABLE planed_sow_injections ADD COLUMN IF NOT EXISTS source_record_id BIGINT`);
+  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS planned_sow_source_record_uq
+    ON planed_sow_injections(source_system, source_record_id) WHERE source_system IS NOT NULL`);
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS vet_questions (
       id BIGSERIAL PRIMARY KEY,
