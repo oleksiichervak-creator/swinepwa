@@ -109,10 +109,15 @@ function renderDoneSow() {
 
   $('#done-sow-results').textContent = query ? `${items.length} of ${doneSowItems.length}` : `${items.length} records`;
   $('#done-sow').innerHTML = items.length
-    ? items.map(x => `<tr><td>${x.id}</td><td>${escapeHtml(x.sow_number)}</td><td>${escapeHtml(x.pen_name)}</td><td>${escapeHtml(x.injection_date)}</td><td>${escapeHtml(x.medicine_name)}</td><td>${x.dose_ml} ml</td><td>${escapeHtml(x.given_by_username)}</td><td>${escapeHtml(x.comment || '—')}</td><td><div class="row-actions">${me.role === 'admin' ? `<button class="secondary done-edit" data-id="${x.id}">Edit</button><button class="danger done-delete" data-id="${x.id}">Delete</button>` : ''}</div></td></tr>`).join('')
+    ? items.map(x => `<tr><td>${x.id}</td><td>${escapeHtml(x.sow_number)}</td><td>${escapeHtml(x.pen_name)}</td><td>${formatDisplayDate(x.injection_date)}</td><td>${escapeHtml(x.medicine_name)}</td><td>${x.dose_ml} ml</td><td>${escapeHtml(x.given_by_username)}</td><td>${escapeHtml(x.comment || '—')}</td><td><div class="row-actions">${me.role === 'admin' ? `<button class="secondary done-edit" data-id="${x.id}">Edit</button><button class="danger done-delete" data-id="${x.id}">Delete</button>` : ''}</div></td></tr>`).join('')
     : `<tr><td colspan="9" class="empty-state">${query ? 'No sow numbers match your search.' : 'No completed sow injections yet.'}</td></tr>`;
   document.querySelectorAll('.done-edit').forEach(button => button.onclick = () => openDoneSow(doneSowItems.find(item => String(item.id) === button.dataset.id)));
   document.querySelectorAll('.done-delete').forEach(button => button.onclick = () => deleteDoneSow(button.dataset.id));
+}
+
+function formatDisplayDate(value) {
+  const match = String(value || '').slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? `${match[3]}.${match[2]}.${match[1]}` : escapeHtml(value);
 }
 
 $('#done-sow-search').addEventListener('input', renderDoneSow);

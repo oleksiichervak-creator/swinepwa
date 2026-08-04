@@ -397,6 +397,7 @@ doneSowInjections.get('/week-report.xlsx', requireAuth, async (req,res,next) => 
       const first=course.injections[0],weight=inferredWeight(first.dose_ml,course.medicine_dose_ml,course.dose_kg);
       const row=sheet.addRow([course.start_date,String(course.sow_number),weight,course.medicine_name,course.diagnosis,`${first.injection_date} - ${formatDose(first.dose_ml)} ml - ${first.given_by_username}\nInjection 1 of ${Math.max(1,Number(course.course_days)||1)}`]);
       row.eachCell({includeEmpty:true},cell=>{cell.font={name:'Calibri',size:11};cell.border=thinBorder;cell.alignment={vertical:'top',wrapText:true};});
+      row.getCell(3).numFmt='0';
     }
     sheet.addRow([]);sheet.addRow([]);
     const usageTitleRow=sheet.rowCount+1;sheet.mergeCells(`A${usageTitleRow}:B${usageTitleRow}`);sheet.getCell(`A${usageTitleRow}`).value='Medicine usage';
@@ -757,7 +758,7 @@ async function buildDoneSowWeekReport(start){
 function isoWeekNumber(value){const date=new Date(`${value}T00:00:00Z`),day=date.getUTCDay()||7;date.setUTCDate(date.getUTCDate()+4-day);const yearStart=new Date(Date.UTC(date.getUTCFullYear(),0,1));return Math.ceil((((date-yearStart)/86400000)+1)/7);}
 function userInitials(value){const parts=String(value||'').trim().split(/[^\p{L}\p{N}]+/u).filter(Boolean);return parts.map(part=>part[0]).join('').toLocaleUpperCase().slice(0,3);}
 function formatDose(value){return Number(value).toLocaleString('en-GB',{maximumFractionDigits:3});}
-function inferredWeight(actualDose,medicineDose,medicineWeight){const dose=Number(medicineDose),weight=dose>0?Number(actualDose)*Number(medicineWeight)/dose:0;return Number(weight.toFixed(2));}
+function inferredWeight(actualDose,medicineDose,medicineWeight){const dose=Number(medicineDose),weight=dose>0?Number(actualDose)*Number(medicineWeight)/dose:0;return Math.round(weight);}
 function html(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function validateVetQuestion(b){const date=normalizeDate(b.question_date,'Question date'),question=typeof b.question==='string'?b.question.trim():'',photo=b.photo==null||b.photo===''?null:String(b.photo).trim();if(!question)throw Object.assign(new Error('Question is required'),{status:400});if(photo&&!/^\/uploads\/[a-f0-9-]+\.(jpg|png|webp)$/.test(photo))throw Object.assign(new Error('Invalid photo path'),{status:400});return{date,question,photo};}
 function validateDailyRemark(b){const date=normalizeDate(b.remark_date,'Remark date'),remark=typeof b.remark==='string'?b.remark.trim():'',photo=b.photo==null||b.photo===''?null:String(b.photo).trim();if(!remark)throw Object.assign(new Error('Remark is required'),{status:400});if(photo&&!/^\/uploads\/[a-f0-9-]+\.(jpg|png|webp)$/.test(photo))throw Object.assign(new Error('Invalid photo path'),{status:400});return{date,remark,photo};}
