@@ -8,6 +8,7 @@ let token = localStorage.getItem('sow-injections-token') || '';
 let currentUser = null;
 let todayItems = [];
 let references = null;
+let installPrompt = null;
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -396,6 +397,40 @@ $('#show-today').addEventListener('click', () => { showScreen('today'); loadToda
 $('#back-button').addEventListener('click', () => showScreen('home'));
 $('#logout-button').addEventListener('click', signOut);
 $('#complete-close').addEventListener('click', () => $('#complete-dialog').close());
+
+const installRequested = new URLSearchParams(location.search).get('install') === '1';
+const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+
+function showInstallDialog() {
+  if (!installRequested || standalone || $('#install-dialog').open) return;
+  const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  if (isIos) $('#install-message').textContent = 'In Safari, tap Share, then select Add to Home Screen.';
+  else if (!installPrompt) $('#install-message').textContent = 'Tap Install app. If no prompt appears, use the browser menu and select Install app.';
+  $('#install-dialog').showModal();
+}
+
+window.addEventListener('beforeinstallprompt', event => {
+  event.preventDefault();
+  installPrompt = event;
+  showInstallDialog();
+});
+
+$('#install-app').addEventListener('click', async () => {
+  if (!installPrompt) {
+    const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    $('#install-message').textContent = isIos
+      ? 'In Safari, tap Share, then select Add to Home Screen.'
+      : 'Open the browser menu and select Install app or Add to Home screen.';
+    return;
+  }
+  await installPrompt.prompt();
+  installPrompt = null;
+  $('#install-dialog').close();
+});
+
+$('#install-dismiss').addEventListener('click', () => $('#install-dialog').close());
+window.addEventListener('appinstalled', () => { if ($('#install-dialog').open) $('#install-dialog').close(); });
+setTimeout(showInstallDialog, 500);
 
 function toast(message) {
   const element = $('#toast');
