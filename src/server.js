@@ -581,14 +581,14 @@ injectionPwa.post('/plans', requireAuth, async (req, res, next) => {
     const pen = (await client.query('SELECT id FROM pens WHERE id=$1', [penId])).rows[0];
     if (!pen) throw Object.assign(new Error('Pen not found'), { status: 404 });
     const selected = (await client.query(
-      'SELECT id,name,dose_ml::float8 AS dose_ml,dose_kg::float8 AS dose_kg FROM medicine_sow WHERE id=$1',
+      'SELECT id,name,dose_ml::float8 AS dose_ml,dose_kg::float8 AS dose_kg,course_days FROM medicine_sow WHERE id=$1',
       [medicineSowId],
     )).rows[0];
     if (!selected) throw Object.assign(new Error('Medicine not found'), { status: 404 });
     const medicines = [selected];
     if (includeMelovem && selected.name.toLocaleLowerCase() !== 'melovem') {
       const melovem = (await client.query(
-        `SELECT id,name,dose_ml::float8 AS dose_ml,dose_kg::float8 AS dose_kg
+        `SELECT id,name,dose_ml::float8 AS dose_ml,dose_kg::float8 AS dose_kg,course_days
          FROM medicine_sow WHERE lower(name)='melovem' LIMIT 1`,
       )).rows[0];
       if (!melovem) throw Object.assign(new Error('Melovem is not available in the medicine list'), { status: 409 });
@@ -600,11 +600,15 @@ injectionPwa.post('/plans', requireAuth, async (req, res, next) => {
         throw Object.assign(new Error(`Dose settings are invalid for ${medicine.name}`), { status: 409 });
       }
       const doseMl = Number((weightKg * medicine.dose_ml / medicine.dose_kg).toFixed(3));
-      const inserted = await client.query(`INSERT INTO planed_sow_injections
-        (sow_number,pen_id,injection_date,medicine_sow_id,dose_ml,comment)
-        VALUES($1,$2,$3,$4,$5,$6) RETURNING id`,
-        [sowNumber, penId, injectionDate, medicine.id, doseMl, comment]);
-      created.push({ id: inserted.rows[0].id, medicine_name: medicine.name, dose_ml: doseMl });
+      const courseDays = Math.max(1, Number(medicine.course_days) || 0);
+      for (let day = 0; day < courseDays; day += 1) {
+        const plannedDate = addUtcDays(injectionDate, day);
+        const inserted = await client.query(`INSERT INTO planed_sow_injections
+          (sow_number,pen_id,injection_date,medicine_sow_id,dose_ml,comment)
+          VALUES($1,$2,$3,$4,$5,$6) RETURNING id`,
+          [sowNumber, penId, plannedDate, medicine.id, doseMl, comment]);
+        created.push({ id: inserted.rows[0].id, medicine_name: medicine.name, dose_ml: doseMl, injection_date: plannedDate });
+      }
     }
     await client.query('COMMIT');
     res.status(201).json({ plans: created, weight_kg: weightKg });
@@ -718,6 +722,7 @@ function validateMedicineSowStorage(body) {
 function storageValues(i) { return [i.medicineSowId,i.bottleVolumeMl,i.bottleCount,i.totalVolumeMl]; }
 
 function normalizeDate(value, label='Date') { const date=value instanceof Date?value.toISOString().slice(0,10):String(value||'').slice(0,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||Number.isNaN(Date.parse(`${date}T00:00:00Z`)))throw Object.assign(new Error(`${label} is invalid`),{status:400});return date; }
+function addUtcDays(value, days){const date=new Date(`${value}T00:00:00Z`);date.setUTCDate(date.getUTCDate()+days);return date.toISOString().slice(0,10);}
 function validateDoneSow(b){const x={sowNumber:typeof b.sow_number==='string'?b.sow_number.trim():'',penId:Number(b.pen_id),injectionDate:normalizeDate(b.injection_date,'Injection date'),medicineSowId:Number(b.medicine_sow_id),doseMl:Number(b.dose_ml),givenByUserId:Number(b.given_by_user_id),comment:b.comment==null||b.comment===''?null:String(b.comment).trim()};if(!x.sowNumber||x.sowNumber.length>100)throw Object.assign(new Error('Sow number is required and must not exceed 100 characters'),{status:400});for(const [v,l] of [[x.penId,'pen'],[x.medicineSowId,'sow medicine'],[x.givenByUserId,'user']])if(!Number.isInteger(v)||v<1)throw Object.assign(new Error(`A valid ${l} is required`),{status:400});if(!Number.isFinite(x.doseMl)||x.doseMl<0)throw Object.assign(new Error('Dose must be zero or greater'),{status:400});return x;}
 function doneSowValues(x){return[x.sowNumber,x.penId,x.injectionDate,x.medicineSowId,x.doseMl,x.givenByUserId,x.comment];}
 function doneSowFilters(q){const clauses=[],values=[];const add=(sql,v)=>{values.push(v);clauses.push(sql.replace('?',`$${values.length}`));};if(q.sow_number)add('i.sow_number=?',String(q.sow_number));for(const [key,col] of [['pen_id','i.pen_id'],['medicine_sow_id','i.medicine_sow_id'],['given_by_user_id','i.given_by_user_id']])if(q[key]!==undefined){const v=Number(q[key]);if(!Number.isInteger(v)||v<1)throw Object.assign(new Error(`${key} must be a positive integer`),{status:400});add(`${col}=?`,v);}if(q.date_from)add('i.injection_date>=?',normalizeDate(q.date_from,'date_from'));if(q.date_to)add('i.injection_date<=?',normalizeDate(q.date_to,'date_to'));return{where:clauses.length?' WHERE '+clauses.join(' AND '):'',values};}

@@ -255,8 +255,13 @@ function updateDosePreview() {
   $('#melovem-option').hidden = !offerMelovem;
   const includeMelovem = offerMelovem && form.include_melovem.checked && melovem;
   $('#dose-preview').innerHTML = `
-    <div><span>${escapeHtml(medicine.name)}</span><strong>${formatDose(dose)} ml</strong></div>
-    ${includeMelovem ? `<div><span>Melovem</span><strong>${formatDose(calculateDose(melovem, weight))} ml</strong></div>` : ''}`;
+    <div><span>${escapeHtml(medicine.name)} · ${courseLabel(medicine)}</span><strong>${formatDose(dose)} ml/day</strong></div>
+    ${includeMelovem ? `<div><span>Melovem · ${courseLabel(melovem)}</span><strong>${formatDose(calculateDose(melovem, weight))} ml/day</strong></div>` : ''}`;
+}
+
+function courseLabel(medicine) {
+  const days = Math.max(1, Number(medicine.course_days) || 0);
+  return `${days} day${days === 1 ? '' : 's'}`;
 }
 
 function calculateDose(medicine, weight) {
