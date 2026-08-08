@@ -24,8 +24,14 @@
           </select>
         </label>
         <label>Password
-          <input id="login-password" type="password" required autocomplete="current-password">
+          <input id="login-password" class="pin-display" type="password" required readonly inputmode="none" autocomplete="off" aria-label="Numeric password">
         </label>
+        <div id="pin-keypad" class="pin-keypad" aria-label="Numeric password keypad">
+          <button type="button" data-pin="1">1</button><button type="button" data-pin="2">2</button><button type="button" data-pin="3">3</button>
+          <button type="button" data-pin="4">4</button><button type="button" data-pin="5">5</button><button type="button" data-pin="6">6</button>
+          <button type="button" data-pin="7">7</button><button type="button" data-pin="8">8</button><button type="button" data-pin="9">9</button>
+          <button type="button" class="pin-action" data-pin-clear aria-label="Clear password">Clear</button><button type="button" data-pin="0">0</button><button type="button" class="pin-action" data-pin-backspace aria-label="Delete last digit">&#9003;</button>
+        </div>
         <p id="login-error" class="error" role="alert"></p>
         <button type="submit">Sign in</button>
       </form>
@@ -68,7 +74,7 @@
           <div class="step" data-step="2" hidden>
             <div class="step-heading"><span>2</span><strong>Pen</strong></div>
             <label>
-              <input id="pen-input" list="pen-options" autocomplete="off" placeholder="Enter pen number">
+              <input id="pen-input" list="pen-options" inputmode="decimal" pattern="[0-9]+([.,][0-9]+)?" autocomplete="off" placeholder="Enter pen number">
               <datalist id="pen-options"></datalist>
               <input name="pen_id" type="hidden">
             </label>

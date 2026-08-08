@@ -1,4 +1,4 @@
-const CACHE = 'sow-injections-v7';
+const CACHE = 'sow-injections-v8';
 const SHELL = [
   '/injections/',
   '/injections/index.html',

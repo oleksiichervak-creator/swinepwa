@@ -196,6 +196,10 @@ async function checkSowHistory(sowNumber) {
 
 let penCheckTimer;
 $('#pen-input').addEventListener('input', () => {
+  const input = $('#pen-input');
+  const normalized = input.value.replace(',', '.').replace(/[^0-9.]/g, '');
+  const [whole, ...decimals] = normalized.split('.');
+  input.value = decimals.length ? `${whole}.${decimals.join('')}` : whole;
   clearTimeout(penCheckTimer);
   $('#plan-form').pen_id.value = '';
   $('#pen-result').textContent = 'Checking pen…';
@@ -205,7 +209,7 @@ $('#pen-input').addEventListener('input', () => {
 });
 
 async function validatePenInput() {
-  const value = $('#pen-input').value.trim().toLocaleLowerCase();
+  const value = $('#pen-input').value.trim().replace(',', '.').toLocaleLowerCase();
   if (!value) {
     $('#pen-result').textContent = '';
     return;
@@ -258,6 +262,18 @@ function updateDosePreview() {
     <div><span>${escapeHtml(medicine.name)} · ${courseLabel(medicine)}</span><strong>${formatDose(dose)} ml/day</strong></div>
     ${includeMelovem ? `<div><span>Melovem · ${courseLabel(melovem)}</span><strong>${formatDose(calculateDose(melovem, weight))} ml/day</strong></div>` : ''}`;
 }
+
+$('#pin-keypad').addEventListener('click', event => {
+  const button = event.target.closest('button');
+  if (!button) return;
+  const input = $('#login-password');
+  if (button.dataset.pin !== undefined && input.value.length < 32) input.value += button.dataset.pin;
+  if (button.hasAttribute('data-pin-backspace')) input.value = input.value.slice(0, -1);
+  if (button.hasAttribute('data-pin-clear')) input.value = '';
+  $('#login-error').textContent = '';
+});
+
+$('#login-user').addEventListener('change', () => { $('#login-password').value = ''; });
 
 function courseLabel(medicine) {
   const days = Math.max(1, Number(medicine.course_days) || 0);
