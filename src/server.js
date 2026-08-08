@@ -359,7 +359,7 @@ app.use('/api/medicine-sow-storage', medicineSowStorage);
 app.use('/medicine-sow-storage', medicineSowStorage);
 
 const doneSowInjections = express.Router();
-const doneSowSelect = `SELECT i.sow_number,i.pen_id,i.injection_date,i.medicine_sow_id,i.dose_ml::float8 AS dose_ml,
+const doneSowSelect = `SELECT i.sow_number,i.pen_id,i.injection_date,i.medicine_sow_id,i.dose_ml::float8 AS dose_ml,i.weight_kg,
   i.given_by_user_id,i.comment,i.id,m.name AS medicine_name,p.name AS pen_name,u.username AS given_by_username,
   i.created_at,i.updated_at FROM done_sow_injections i JOIN pens p ON p.id=i.pen_id
   JOIN medicine_sow m ON m.id=i.medicine_sow_id JOIN users u ON u.id=i.given_by_user_id`;
@@ -371,7 +371,7 @@ doneSowInjections.get('/', requireAuth, async (req,res,next) => {
 
 doneSowInjections.post('/', requireAuth, requireAdmin, async (req,res,next) => {
   try { const x=validateDoneSow(req.body); const inserted=await pool.query(`INSERT INTO done_sow_injections
-    (sow_number,pen_id,injection_date,medicine_sow_id,dose_ml,given_by_user_id,comment) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id`,doneSowValues(x));
+    (sow_number,pen_id,injection_date,medicine_sow_id,dose_ml,weight_kg,given_by_user_id,comment) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,doneSowValues(x));
     res.status(201).json((await pool.query(doneSowSelect+' WHERE i.id=$1',[inserted.rows[0].id])).rows[0]); } catch(error){handleDbError(error,res,next);}
 });
 
@@ -394,7 +394,7 @@ doneSowInjections.get('/week-report.xlsx', requireAuth, async (req,res,next) => 
     const headerFill={type:'pattern',pattern:'solid',fgColor:{argb:'FFEFEFEF'}};
     sheet.getRow(4).eachCell(cell=>{cell.font={name:'Calibri',size:11,bold:true};cell.fill=headerFill;cell.border=thinBorder;cell.alignment={horizontal:'center',vertical:'middle',wrapText:true};});
     for(const course of report.courses){
-      const first=course.injections[0],weight=inferredWeight(first.dose_ml,course.medicine_dose_ml,course.dose_kg);
+      const first=course.injections[0],weight=first.weight_kg??inferredWeight(first.dose_ml,course.medicine_dose_ml,course.dose_kg);
       const row=sheet.addRow([course.start_date,String(course.sow_number),weight,course.medicine_name,course.diagnosis,`${first.injection_date} - ${formatDose(first.dose_ml)} ml - ${first.given_by_username}\nInjection 1 of ${Math.max(1,Number(course.course_days)||1)}`]);
       row.eachCell({includeEmpty:true},cell=>{cell.font={name:'Calibri',size:11};cell.border=thinBorder;cell.alignment={vertical:'top',wrapText:true};});
       row.getCell(3).numFmt='0';
@@ -421,7 +421,7 @@ doneSowInjections.get('/week-report-print', requireAuth, async (req,res,next) =>
 });
 
 doneSowInjections.get('/:id', requireAuth, async(req,res,next)=>{try{const r=await pool.query(doneSowSelect+' WHERE i.id=$1',[req.params.id]);if(!r.rows[0])return res.status(404).json({error:'Done sow injection not found'});res.json(r.rows[0]);}catch(e){next(e);}});
-doneSowInjections.patch('/:id', requireAuth, requireAdmin, async(req,res,next)=>{try{const allowed=['sow_number','pen_id','injection_date','medicine_sow_id','dose_ml','given_by_user_id','comment'];if(!allowed.some(f=>Object.hasOwn(req.body,f)))return res.status(400).json({error:'No fields to update'});const cur=await pool.query('SELECT sow_number,pen_id,injection_date,medicine_sow_id,dose_ml,given_by_user_id,comment FROM done_sow_injections WHERE id=$1',[req.params.id]);if(!cur.rows[0])return res.status(404).json({error:'Done sow injection not found'});const x=validateDoneSow({...cur.rows[0],...req.body});await pool.query('UPDATE done_sow_injections SET sow_number=$1,pen_id=$2,injection_date=$3,medicine_sow_id=$4,dose_ml=$5,given_by_user_id=$6,comment=$7,updated_at=NOW() WHERE id=$8',[...doneSowValues(x),req.params.id]);res.json((await pool.query(doneSowSelect+' WHERE i.id=$1',[req.params.id])).rows[0]);}catch(e){handleDbError(e,res,next);}});
+doneSowInjections.patch('/:id', requireAuth, requireAdmin, async(req,res,next)=>{try{const allowed=['sow_number','pen_id','injection_date','medicine_sow_id','dose_ml','weight_kg','given_by_user_id','comment'];if(!allowed.some(f=>Object.hasOwn(req.body,f)))return res.status(400).json({error:'No fields to update'});const cur=await pool.query('SELECT sow_number,pen_id,injection_date,medicine_sow_id,dose_ml,weight_kg,given_by_user_id,comment FROM done_sow_injections WHERE id=$1',[req.params.id]);if(!cur.rows[0])return res.status(404).json({error:'Done sow injection not found'});const x=validateDoneSow({...cur.rows[0],...req.body});await pool.query('UPDATE done_sow_injections SET sow_number=$1,pen_id=$2,injection_date=$3,medicine_sow_id=$4,dose_ml=$5,weight_kg=$6,given_by_user_id=$7,comment=$8,updated_at=NOW() WHERE id=$9',[...doneSowValues(x),req.params.id]);res.json((await pool.query(doneSowSelect+' WHERE i.id=$1',[req.params.id])).rows[0]);}catch(e){handleDbError(e,res,next);}});
 doneSowInjections.delete('/:id', requireAuth, requireAdmin, async(req,res,next)=>{try{const r=await pool.query('DELETE FROM done_sow_injections WHERE id=$1 RETURNING id',[req.params.id]);if(!r.rows[0])return res.status(404).json({error:'Done sow injection not found'});res.status(204).end();}catch(e){next(e);}});
 app.use('/api/done-sow-injections',doneSowInjections); app.use('/done-sow-injections',doneSowInjections);
 
@@ -474,7 +474,7 @@ app.use('/api/todos',todos);app.use('/todos',todos);
 
 const sowInjections = express.Router();
 const sowInjectionSelect = `SELECT i.sow_number, i.pen_id, i.injection_date, i.medicine_sow_id,
-  i.dose_ml::float8 AS dose_ml, i.comment, i.id, m.name AS medicine_name, p.name AS pen_name,
+  i.dose_ml::float8 AS dose_ml, i.weight_kg, i.comment, i.id, m.name AS medicine_name, p.name AS pen_name,
   i.created_at, i.updated_at FROM planed_sow_injections i JOIN pens p ON p.id = i.pen_id
   JOIN medicine_sow m ON m.id = i.medicine_sow_id`;
 
@@ -604,9 +604,9 @@ injectionPwa.post('/plans', requireAuth, async (req, res, next) => {
       for (let day = 0; day < courseDays; day += 1) {
         const plannedDate = addUtcDays(injectionDate, day);
         const inserted = await client.query(`INSERT INTO planed_sow_injections
-          (sow_number,pen_id,injection_date,medicine_sow_id,dose_ml,comment)
-          VALUES($1,$2,$3,$4,$5,$6) RETURNING id`,
-          [sowNumber, penId, plannedDate, medicine.id, doseMl, comment]);
+          (sow_number,pen_id,injection_date,medicine_sow_id,dose_ml,weight_kg,comment)
+          VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+          [sowNumber, penId, plannedDate, medicine.id, doseMl, weightKg, comment]);
         created.push({ id: inserted.rows[0].id, medicine_name: medicine.name, dose_ml: doseMl, injection_date: plannedDate });
       }
     }
@@ -625,8 +625,9 @@ injectionPwa.post('/plans/:id/complete', requireAuth, async (req, res, next) => 
   try {
     await client.query('BEGIN');
     const planned = (await client.query(
-      `SELECT sow_number, pen_id, injection_date, medicine_sow_id, dose_ml, comment
-       FROM planed_sow_injections WHERE id = $1 FOR UPDATE`,
+      `SELECT i.sow_number, i.pen_id, i.injection_date, i.medicine_sow_id, i.dose_ml, i.comment,
+        COALESCE(i.weight_kg, CASE WHEN m.dose_ml > 0 THEN ROUND(i.dose_ml * m.dose_kg / m.dose_ml)::integer END) AS weight_kg
+       FROM planed_sow_injections i JOIN medicine_sow m ON m.id=i.medicine_sow_id WHERE i.id = $1 FOR UPDATE OF i`,
       [req.params.id],
     )).rows[0];
     if (!planned) {
@@ -641,8 +642,8 @@ injectionPwa.post('/plans/:id/complete', requireAuth, async (req, res, next) => 
       given_by_user_id: req.user.sub,
     });
     const inserted = await client.query(`INSERT INTO done_sow_injections
-      (sow_number,pen_id,injection_date,medicine_sow_id,dose_ml,given_by_user_id,comment)
-      VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id`, doneSowValues(completed));
+      (sow_number,pen_id,injection_date,medicine_sow_id,dose_ml,weight_kg,given_by_user_id,comment)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`, doneSowValues(completed));
     await client.query('DELETE FROM planed_sow_injections WHERE id = $1', [req.params.id]);
     await client.query('COMMIT');
     res.status(201).json((await pool.query(doneSowSelect + ' WHERE i.id = $1', [inserted.rows[0].id])).rows[0]);
@@ -723,13 +724,13 @@ function storageValues(i) { return [i.medicineSowId,i.bottleVolumeMl,i.bottleCou
 
 function normalizeDate(value, label='Date') { const date=value instanceof Date?value.toISOString().slice(0,10):String(value||'').slice(0,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||Number.isNaN(Date.parse(`${date}T00:00:00Z`)))throw Object.assign(new Error(`${label} is invalid`),{status:400});return date; }
 function addUtcDays(value, days){const date=new Date(`${value}T00:00:00Z`);date.setUTCDate(date.getUTCDate()+days);return date.toISOString().slice(0,10);}
-function validateDoneSow(b){const x={sowNumber:typeof b.sow_number==='string'?b.sow_number.trim():'',penId:Number(b.pen_id),injectionDate:normalizeDate(b.injection_date,'Injection date'),medicineSowId:Number(b.medicine_sow_id),doseMl:Number(b.dose_ml),givenByUserId:Number(b.given_by_user_id),comment:b.comment==null||b.comment===''?null:String(b.comment).trim()};if(!x.sowNumber||x.sowNumber.length>100)throw Object.assign(new Error('Sow number is required and must not exceed 100 characters'),{status:400});for(const [v,l] of [[x.penId,'pen'],[x.medicineSowId,'sow medicine'],[x.givenByUserId,'user']])if(!Number.isInteger(v)||v<1)throw Object.assign(new Error(`A valid ${l} is required`),{status:400});if(!Number.isFinite(x.doseMl)||x.doseMl<0)throw Object.assign(new Error('Dose must be zero or greater'),{status:400});return x;}
-function doneSowValues(x){return[x.sowNumber,x.penId,x.injectionDate,x.medicineSowId,x.doseMl,x.givenByUserId,x.comment];}
+function validateDoneSow(b){const x={sowNumber:typeof b.sow_number==='string'?b.sow_number.trim():'',penId:Number(b.pen_id),injectionDate:normalizeDate(b.injection_date,'Injection date'),medicineSowId:Number(b.medicine_sow_id),doseMl:Number(b.dose_ml),weightKg:b.weight_kg==null||b.weight_kg===''?null:Number(b.weight_kg),givenByUserId:Number(b.given_by_user_id),comment:b.comment==null||b.comment===''?null:String(b.comment).trim()};if(!x.sowNumber||x.sowNumber.length>100)throw Object.assign(new Error('Sow number is required and must not exceed 100 characters'),{status:400});for(const [v,l] of [[x.penId,'pen'],[x.medicineSowId,'sow medicine'],[x.givenByUserId,'user']])if(!Number.isInteger(v)||v<1)throw Object.assign(new Error(`A valid ${l} is required`),{status:400});if(!Number.isFinite(x.doseMl)||x.doseMl<0)throw Object.assign(new Error('Dose must be zero or greater'),{status:400});if(x.weightKg!==null&&(!Number.isInteger(x.weightKg)||x.weightKg<1))throw Object.assign(new Error('Weight must be a positive whole number'),{status:400});return x;}
+function doneSowValues(x){return[x.sowNumber,x.penId,x.injectionDate,x.medicineSowId,x.doseMl,x.weightKg,x.givenByUserId,x.comment];}
 function doneSowFilters(q){const clauses=[],values=[];const add=(sql,v)=>{values.push(v);clauses.push(sql.replace('?',`$${values.length}`));};if(q.sow_number)add('i.sow_number=?',String(q.sow_number));for(const [key,col] of [['pen_id','i.pen_id'],['medicine_sow_id','i.medicine_sow_id'],['given_by_user_id','i.given_by_user_id']])if(q[key]!==undefined){const v=Number(q[key]);if(!Number.isInteger(v)||v<1)throw Object.assign(new Error(`${key} must be a positive integer`),{status:400});add(`${col}=?`,v);}if(q.date_from)add('i.injection_date>=?',normalizeDate(q.date_from,'date_from'));if(q.date_to)add('i.injection_date<=?',normalizeDate(q.date_to,'date_to'));return{where:clauses.length?' WHERE '+clauses.join(' AND '):'',values};}
 async function buildDoneSowWeekReport(start){
   const startDate=normalizeDate(start,'start_date'),end=new Date(`${startDate}T00:00:00Z`);end.setUTCDate(end.getUTCDate()+6);
   const endDate=end.toISOString().slice(0,10);
-  const reportSelect=`SELECT i.sow_number,i.injection_date,i.medicine_sow_id,i.dose_ml::float8 AS dose_ml,i.comment,i.id,
+  const reportSelect=`SELECT i.sow_number,i.injection_date,i.medicine_sow_id,i.dose_ml::float8 AS dose_ml,i.weight_kg,i.comment,i.id,
     m.name AS medicine_name,m.diagnosis,m.course_days,m.interval_hours,m.dose_ml::float8 AS medicine_dose_ml,
     m.dose_kg::float8 AS dose_kg,p.name AS pen_name,u.username AS given_by_username
     FROM done_sow_injections i JOIN medicine_sow m ON m.id=i.medicine_sow_id
