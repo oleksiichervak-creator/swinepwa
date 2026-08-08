@@ -464,6 +464,45 @@ repairLocations.patch('/:id',requireAuth,requireAdmin,async(req,res,next)=>{try{
 repairLocations.delete('/:id',requireAuth,requireAdmin,async(req,res,next)=>{try{const r=await pool.query('DELETE FROM repair_locations WHERE id=$1 RETURNING id,photo',[req.params.id]);if(!r.rows[0])return res.status(404).json({error:'Repair location not found'});await removeUnusedUpload(r.rows[0].photo);res.status(204).end();}catch(e){next(e);}});
 app.use('/api/repair-locations',repairLocations);app.use('/repair-locations',repairLocations);
 
+const altersyn = express.Router();
+const altersynSelect = `SELECT id,"group" AS "group",ventil,amount,juice_start_date,juice_stop_date,
+  altersyn_start_date,altersyn_stop_date,created_at,updated_at FROM altersyn`;
+
+altersyn.get('/', requireAuth, async (_req, res, next) => {
+  try { res.json((await pool.query(altersynSelect + ' ORDER BY altersyn_start_date DESC,id DESC')).rows); }
+  catch (error) { next(error); }
+});
+altersyn.post('/', requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const input = validateAltersyn(req.body);
+    const result = await pool.query(`INSERT INTO altersyn
+      ("group",ventil,amount,juice_start_date,juice_stop_date,altersyn_start_date,altersyn_stop_date)
+      VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id`, altersynValues(input));
+    res.status(201).json((await pool.query(altersynSelect + ' WHERE id=$1', [result.rows[0].id])).rows[0]);
+  } catch (error) { handleDbError(error, res, next); }
+});
+altersyn.get('/:id', requireAuth, async (req, res, next) => {
+  try { const result=await pool.query(altersynSelect+' WHERE id=$1',[req.params.id]);if(!result.rows[0])return res.status(404).json({error:'Altersyn record not found'});res.json(result.rows[0]); }
+  catch (error) { next(error); }
+});
+altersyn.patch('/:id', requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const fields=['group','ventil','amount','juice_start_date','juice_stop_date','altersyn_start_date','altersyn_stop_date'];
+    if(!fields.some(field=>Object.hasOwn(req.body,field)))return res.status(400).json({error:'No fields to update'});
+    const current=await pool.query('SELECT "group" AS "group",ventil,amount,juice_start_date,juice_stop_date,altersyn_start_date,altersyn_stop_date FROM altersyn WHERE id=$1',[req.params.id]);
+    if(!current.rows[0])return res.status(404).json({error:'Altersyn record not found'});
+    const input=validateAltersyn({...current.rows[0],...req.body});
+    await pool.query(`UPDATE altersyn SET "group"=$1,ventil=$2,amount=$3,juice_start_date=$4,juice_stop_date=$5,
+      altersyn_start_date=$6,altersyn_stop_date=$7,updated_at=NOW() WHERE id=$8`,[...altersynValues(input),req.params.id]);
+    res.json((await pool.query(altersynSelect+' WHERE id=$1',[req.params.id])).rows[0]);
+  } catch (error) { handleDbError(error, res, next); }
+});
+altersyn.delete('/:id', requireAuth, requireAdmin, async (req, res, next) => {
+  try { const result=await pool.query('DELETE FROM altersyn WHERE id=$1 RETURNING id',[req.params.id]);if(!result.rows[0])return res.status(404).json({error:'Altersyn record not found'});res.status(204).end(); }
+  catch (error) { next(error); }
+});
+app.use('/api/altersyn',altersyn);app.use('/altersyn',altersyn);
+
 const todos=express.Router();const todoSelect='SELECT id,task,due_date,is_completed,completed_at,created_at,updated_at FROM todo_items';
 todos.get('/',requireAuth,async(req,res,next)=>{try{const values=[];let where='';if(req.query.completed!==undefined){if(!['true','false'].includes(String(req.query.completed)))return res.status(400).json({error:'completed must be true or false'});values.push(req.query.completed==='true');where=' WHERE is_completed=$1';}res.json((await pool.query(todoSelect+where+' ORDER BY is_completed,due_date,id',values)).rows);}catch(e){next(e);}});
 todos.post('/',requireAuth,requireAdmin,async(req,res,next)=>{try{const x=validateTodo(req.body);const r=await pool.query('INSERT INTO todo_items(task,due_date,is_completed,completed_at) VALUES($1,$2,$3,$4) RETURNING id,task,due_date,is_completed,completed_at,created_at,updated_at',[x.task,x.dueDate,x.completed,x.completed?new Date():null]);res.status(201).json(r.rows[0]);}catch(e){handleDbError(e,res,next);}});
@@ -770,6 +809,8 @@ function validateVetQuestion(b){const date=normalizeDate(b.question_date,'Questi
 function validateDailyRemark(b){const date=normalizeDate(b.remark_date,'Remark date'),remark=typeof b.remark==='string'?b.remark.trim():'',photo=b.photo==null||b.photo===''?null:String(b.photo).trim();if(!remark)throw Object.assign(new Error('Remark is required'),{status:400});if(photo&&!/^\/uploads\/[a-f0-9-]+\.(jpg|png|webp)$/.test(photo))throw Object.assign(new Error('Invalid photo path'),{status:400});return{date,remark,photo};}
 function validateRepairLocation(b){const date=normalizeDate(b.repair_date,'Repair date'),location=typeof b.location==='string'?b.location.trim():'',comment=b.comment==null||b.comment===''?null:String(b.comment).trim(),photo=b.photo==null||b.photo===''?null:String(b.photo).trim();if(!location||location.length>300)throw Object.assign(new Error('Location is required and must not exceed 300 characters'),{status:400});if(photo&&!/^\/uploads\/[a-f0-9-]+\.(jpg|png|webp)$/.test(photo))throw Object.assign(new Error('Invalid photo path'),{status:400});return{date,location,comment,photo};}
 function validateTodo(b){const task=typeof b.task==='string'?b.task.trim():'',dueDate=normalizeDate(b.due_date,'Due date'),completed=b.is_completed===true||b.is_completed==='true';if(!task)throw Object.assign(new Error('Task is required'),{status:400});if(task.length>2000)throw Object.assign(new Error('Task must not exceed 2000 characters'),{status:400});return{task,dueDate,completed};}
+function validateAltersyn(body){const group=typeof body.group==='string'?body.group.trim():'',ventil=typeof body.ventil==='string'?body.ventil.trim():'',amount=Number(body.amount),juiceStartDate=normalizeDate(body.juice_start_date,'Juice start date'),juiceStopDate=normalizeDate(body.juice_stop_date,'Juice stop date'),altersynStartDate=normalizeDate(body.altersyn_start_date,'Altersyn start date'),altersynStopDate=normalizeDate(body.altersyn_stop_date,'Altersyn stop date');if(!group||group.length>150)throw Object.assign(new Error('Group is required and must not exceed 150 characters'),{status:400});if(!ventil||ventil.length>150)throw Object.assign(new Error('Ventil is required and must not exceed 150 characters'),{status:400});if(!Number.isInteger(amount)||amount<0)throw Object.assign(new Error('Amount must be a non-negative whole number'),{status:400});if(juiceStopDate<juiceStartDate)throw Object.assign(new Error('Juice stop date must not be before its start date'),{status:400});if(altersynStopDate<altersynStartDate)throw Object.assign(new Error('Altersyn stop date must not be before its start date'),{status:400});return{group,ventil,amount,juiceStartDate,juiceStopDate,altersynStartDate,altersynStopDate};}
+function altersynValues(value){return[value.group,value.ventil,value.amount,value.juiceStartDate,value.juiceStopDate,value.altersynStartDate,value.altersynStopDate];}
 async function removeUnusedUpload(photo){if(!photo)return;const count=await pool.query(`SELECT (SELECT COUNT(*) FROM vet_questions WHERE photo=$1)+(SELECT COUNT(*) FROM daily_remarks WHERE photo=$1)+(SELECT COUNT(*) FROM repair_locations WHERE photo=$1) AS count`,[photo]);if(Number(count.rows[0].count)===0){const name=path.basename(photo);try{await fs.promises.unlink(path.join(uploadDir,name));}catch(e){if(e.code!=='ENOENT')throw e;}}}
 function validStoredName(value){const name=String(value||'');if(!/^[a-f0-9-]{36}(\.[a-z0-9]{1,10})?$/.test(name))throw Object.assign(new Error('Invalid stored file name'),{status:400});return name;}
 
