@@ -7,6 +7,7 @@ const localDate = () => {
 let token = localStorage.getItem('sow-injections-token') || '';
 let currentUser = null;
 let todayItems = [];
+let altersynTodayItems = [];
 let references = null;
 let installPrompt = null;
 
@@ -94,7 +95,7 @@ function signOut() {
 }
 
 function showScreen(name) {
-  for (const screen of ['home', 'plan', 'today']) $(`#${screen}-screen`).hidden = screen !== name;
+  for (const screen of ['home', 'plan', 'today', 'altersyn-today']) $(`#${screen}-screen`).hidden = screen !== name;
   $('#back-button').hidden = name === 'home';
   $('#screen-title').textContent = '';
   $('#logout-button').hidden = name !== 'home';
@@ -340,6 +341,47 @@ async function loadToday() {
   }
 }
 
+async function loadAltersynToday() {
+  const list = $('#altersyn-today-list');
+  $('#altersyn-today-date').textContent = new Intl.DateTimeFormat('en-GB', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  }).format(new Date());
+  list.innerHTML = '<div class="empty">Loading…</div>';
+  try {
+    altersynTodayItems = await api(`/api/injection-pwa/altersyn-today?date=${localDate()}`);
+    list.innerHTML = altersynTodayItems.length ? altersynTodayItems.map(item => `
+      <article class="injection-card altersyn-card" data-altersyn-id="${item.id}">
+        <header><h2>Group ${escapeHtml(item.group)}</h2><span class="status ${item.completed ? 'done' : 'planned'}">${item.completed ? 'Done' : 'Today'}</span></header>
+        <div class="altersyn-details"><div><span>Ventil</span><strong>${escapeHtml(item.ventil)}</strong></div><div><span>Amount</span><strong>${item.amount}</strong></div></div>
+        ${item.completed ? '<p class="completed-note">Altersyn has already been registered today.</p>' : `
+          <div class="extra-dose-row"><span>Extra doses</span><div class="stepper"><button type="button" data-extra-minus aria-label="Decrease extra doses">−</button><output>2</output><button type="button" data-extra-plus aria-label="Increase extra doses">+</button></div></div>
+          <button class="complete-button" type="button" data-altersyn-done>Done</button>`}
+      </article>`).join('') : '<div class="empty">No Altersyn treatment scheduled for today.</div>';
+    list.querySelectorAll('.altersyn-card').forEach(card => {
+      const output = card.querySelector('output');
+      card.querySelector('[data-extra-minus]')?.addEventListener('click', () => { output.value = Math.max(0, Number(output.value) - 1); });
+      card.querySelector('[data-extra-plus]')?.addEventListener('click', () => { output.value = Number(output.value) + 1; });
+      card.querySelector('[data-altersyn-done]')?.addEventListener('click', event => completeAltersyn(card.dataset.altersynId, Number(output.value), event.currentTarget));
+    });
+  } catch (error) {
+    list.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
+  }
+}
+
+async function completeAltersyn(id, extraDoses, button) {
+  button.disabled = true;
+  try {
+    await api(`/api/injection-pwa/altersyn/${id}/complete`, {
+      method: 'POST', body: JSON.stringify({ done_date: localDate(), extra_doses: extraDoses }),
+    });
+    await loadAltersynToday();
+    toast('Altersyn registered');
+  } catch (error) {
+    toast(error.message);
+    button.disabled = false;
+  }
+}
+
 function comparePens(left, right) {
   const a = String(left.pen_name).trim();
   const b = String(right.pen_name).trim();
@@ -415,6 +457,7 @@ $('#complete-form').addEventListener('submit', async event => {
 });
 
 $('#show-today').addEventListener('click', () => { showScreen('today'); loadToday(); });
+$('#show-altersyn-today').addEventListener('click', () => { showScreen('altersyn-today'); loadAltersynToday(); });
 $('#back-button').addEventListener('click', () => showScreen('home'));
 $('#logout-button').addEventListener('click', signOut);
 $('#complete-close').addEventListener('click', () => $('#complete-dialog').close());

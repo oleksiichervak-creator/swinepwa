@@ -57,6 +57,10 @@
             <span class="choice-icon today-icon" aria-hidden="true">&#128137;</span>
             <span><strong>Injections for today</strong><small>Register completed injections</small></span>
           </button>
+          <button id="show-altersyn-today" class="choice-card accent" type="button">
+            <span class="choice-icon altersyn-icon" aria-hidden="true">A</span>
+            <span><strong>Altersyn for today</strong><small>Register today's Altersyn treatment</small></span>
+          </button>
         </div>
       </section>
 
@@ -119,6 +123,11 @@
         <p id="today-date-label" class="today-date-label"></p>
         <div id="medicine-summary" class="medicine-summary" aria-live="polite"></div>
         <div id="today-list" class="injection-list" aria-live="polite"></div>
+      </section>
+
+      <section id="altersyn-today-screen" class="screen" hidden>
+        <p id="altersyn-today-date" class="today-date-label"></p>
+        <div id="altersyn-today-list" class="injection-list" aria-live="polite"></div>
       </section>
     </section>
   </main>

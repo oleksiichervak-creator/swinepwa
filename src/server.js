@@ -627,6 +627,36 @@ injectionPwa.get('/today', requireAuth, async (req, res, next) => {
   }
 });
 
+injectionPwa.get('/altersyn-today', requireAuth, async (req, res, next) => {
+  try {
+    const date = normalizeDate(req.query.date || new Date(), 'date');
+    const result = await pool.query(`SELECT a.id,a."group" AS "group",a.ventil,a.amount,
+      EXISTS(SELECT 1 FROM donealtersyn d WHERE d."group"=a."group" AND d.done_date=$1) AS completed
+      FROM altersyn a WHERE $1 BETWEEN a.altersyn_start_date AND a.altersyn_stop_date
+      ORDER BY a."group",a.id`, [date]);
+    res.json(result.rows);
+  } catch (error) {
+    if (error.status) return res.status(error.status).json({ error: error.message });
+    next(error);
+  }
+});
+
+injectionPwa.post('/altersyn/:id/complete', requireAuth, async (req, res, next) => {
+  try {
+    const date = normalizeDate(req.body.done_date || new Date(), 'Date');
+    const extraDoses = Number(req.body.extra_doses);
+    if (!Number.isInteger(extraDoses) || extraDoses < 0) return res.status(400).json({ error: 'Extra doses must be a non-negative whole number' });
+    const record = (await pool.query(`SELECT id,"group" AS "group",amount FROM altersyn
+      WHERE id=$1 AND $2 BETWEEN altersyn_start_date AND altersyn_stop_date`, [req.params.id, date])).rows[0];
+    if (!record) return res.status(404).json({ error: 'No active Altersyn group was found for this date' });
+    const duplicate = await pool.query('SELECT id FROM donealtersyn WHERE "group"=$1 AND done_date=$2', [record.group, date]);
+    if (duplicate.rows[0]) return res.status(409).json({ error: 'This Altersyn group is already completed for today' });
+    const inserted = await pool.query(`INSERT INTO donealtersyn("group",amount,extra_doses,done_date,given_by_user_id)
+      VALUES($1,$2,$3,$4,$5) RETURNING id`, [record.group, record.amount, extraDoses, date, req.user.sub]);
+    res.status(201).json((await pool.query(doneAltersynSelect+' WHERE d.id=$1',[inserted.rows[0].id])).rows[0]);
+  } catch (error) { handleDbError(error, res, next); }
+});
+
 injectionPwa.post('/plans', requireAuth, async (req, res, next) => {
   const client = await pool.connect();
   try {
