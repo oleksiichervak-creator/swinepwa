@@ -95,7 +95,7 @@ function signOut() {
 }
 
 function showScreen(name) {
-  for (const screen of ['home', 'plan', 'today', 'altersyn-today']) $(`#${screen}-screen`).hidden = screen !== name;
+  for (const screen of ['home', 'plan', 'today', 'altersyn-today', 'sow-info']) $(`#${screen}-screen`).hidden = screen !== name;
   $('#back-button').hidden = name === 'home';
   $('#screen-title').textContent = '';
   $('#logout-button').hidden = name !== 'home';
@@ -382,6 +382,34 @@ async function completeAltersyn(id, extraDoses, button) {
   }
 }
 
+async function loadSowInfo(sowNumber) {
+  const results = $('#sow-info-results');
+  $('#sow-info-error').textContent = '';
+  results.innerHTML = '<div class="empty">Loading…</div>';
+  try {
+    const items = await api(`/api/injection-pwa/history?sow_number=${encodeURIComponent(sowNumber)}`);
+    results.innerHTML = items.length ? `
+      <div class="sow-info-heading"><span>Sow number</span><strong>${escapeHtml(sowNumber)}</strong><small>${items.length} injection${items.length === 1 ? '' : 's'}</small></div>
+      ${items.map(item => `<article class="injection-card info-card">
+        <header><h2>${escapeHtml(item.medicine_name)}</h2><span class="status ${item.status}">${item.status === 'done' ? 'Done' : 'Planned'}</span></header>
+        <div class="info-details">
+          <div><span>Date</span><strong>${formatHistoryDate(item.injection_date)}</strong></div>
+          <div><span>Pen</span><strong>${escapeHtml(item.pen_name)}</strong></div>
+          <div><span>Dose</span><strong>${item.dose_ml} ml</strong></div>
+        </div>
+        ${item.comment ? `<p class="info-comment">${escapeHtml(item.comment)}</p>` : ''}
+      </article>`).join('')}` : `<div class="empty">No planned or completed injections found for sow ${escapeHtml(sowNumber)}.</div>`;
+  } catch (error) {
+    results.innerHTML = '';
+    $('#sow-info-error').textContent = error.message;
+  }
+}
+
+function formatHistoryDate(value) {
+  const [year, month, day] = String(value).slice(0, 10).split('-');
+  return year && month && day ? `${day}.${month}.${year}` : escapeHtml(value);
+}
+
 function comparePens(left, right) {
   const a = String(left.pen_name).trim();
   const b = String(right.pen_name).trim();
@@ -458,6 +486,18 @@ $('#complete-form').addEventListener('submit', async event => {
 
 $('#show-today').addEventListener('click', () => { showScreen('today'); loadToday(); });
 $('#show-altersyn-today').addEventListener('click', () => { showScreen('altersyn-today'); loadAltersynToday(); });
+$('#show-sow-info').addEventListener('click', () => {
+  showScreen('sow-info');
+  $('#sow-info-form').reset();
+  $('#sow-info-error').textContent = '';
+  $('#sow-info-results').innerHTML = '';
+  $('#sow-info-form').sow_number.focus();
+});
+$('#sow-info-form').addEventListener('submit', event => {
+  event.preventDefault();
+  const sowNumber = event.currentTarget.sow_number.value.trim();
+  if (sowNumber) loadSowInfo(sowNumber);
+});
 $('#back-button').addEventListener('click', () => showScreen('home'));
 $('#logout-button').addEventListener('click', signOut);
 $('#complete-close').addEventListener('click', () => $('#complete-dialog').close());

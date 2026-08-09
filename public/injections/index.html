@@ -8,6 +8,7 @@
   <link rel="manifest" href="/injections/manifest.json">
   <link rel="icon" href="/injections/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/injections/styles.css">
+  <style>.sow-info-icon{background:#e3e8f5;color:#334f8f;font-size:25px;font-weight:950}.info-search{margin-bottom:14px}.info-search label{margin-bottom:12px}.sow-info-heading{display:grid;grid-template-columns:1fr auto;align-items:end;padding:4px 3px}.sow-info-heading span,.sow-info-heading small{color:#64766b;font-size:12px;font-weight:750}.sow-info-heading strong{grid-row:2;font-size:24px}.sow-info-heading small{grid-column:2;grid-row:2}.info-details{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.info-details div{display:grid;gap:2px;padding:9px;border-radius:10px;background:#eef5f0}.info-details span{color:#64766b;font-size:10px;font-weight:750;text-transform:uppercase}.info-details strong{font-size:13px}.info-comment{margin:10px 0 0;padding:9px 11px;border-left:3px solid #9bb7a5;background:#f6f9f7;color:#52675b;font-size:12px}</style>
   <title>Sow Injections</title>
 </head>
 <body>
@@ -60,6 +61,10 @@
           <button id="show-altersyn-today" class="choice-card accent" type="button">
             <span class="choice-icon altersyn-icon" aria-hidden="true">A</span>
             <span><strong>Altersyn for today</strong><small>Register today's Altersyn treatment</small></span>
+          </button>
+          <button id="show-sow-info" class="choice-card accent" type="button">
+            <span class="choice-icon sow-info-icon" aria-hidden="true">i</span>
+            <span><strong>Sow Injections Info</strong><small>View planned and completed injections</small></span>
           </button>
         </div>
       </section>
@@ -128,6 +133,17 @@
       <section id="altersyn-today-screen" class="screen" hidden>
         <p id="altersyn-today-date" class="today-date-label"></p>
         <div id="altersyn-today-list" class="injection-list" aria-live="polite"></div>
+      </section>
+
+      <section id="sow-info-screen" class="screen" hidden>
+        <form id="sow-info-form" class="panel info-search">
+          <label>Sow number
+            <input name="sow_number" required maxlength="100" inputmode="numeric" autocomplete="off" placeholder="Enter sow number">
+          </label>
+          <button type="submit">Show injections</button>
+        </form>
+        <p id="sow-info-error" class="error" role="alert"></p>
+        <div id="sow-info-results" class="injection-list" aria-live="polite"></div>
       </section>
     </section>
   </main>
