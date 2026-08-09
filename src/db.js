@@ -275,6 +275,20 @@ export async function initializeDatabase() {
     )
   `);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS donealtersyn (
+      id BIGSERIAL PRIMARY KEY,
+      "group" VARCHAR(150) NOT NULL,
+      amount INTEGER NOT NULL CHECK (amount >= 0),
+      extra_doses INTEGER NOT NULL DEFAULT 0 CHECK (extra_doses >= 0),
+      total_altersyn_ml INTEGER GENERATED ALWAYS AS ((amount + extra_doses) * 5) STORED,
+      done_date DATE NOT NULL,
+      given_by_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
   await pool.query(`ALTER TABLE planed_sow_injections ADD COLUMN IF NOT EXISTS source_system VARCHAR(50)`);
   await pool.query(`ALTER TABLE planed_sow_injections ADD COLUMN IF NOT EXISTS source_record_id BIGINT`);
   await pool.query(`ALTER TABLE planed_sow_injections ADD COLUMN IF NOT EXISTS weight_kg INTEGER CHECK (weight_kg > 0)`);
