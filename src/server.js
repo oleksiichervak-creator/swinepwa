@@ -595,6 +595,42 @@ app.use('/api/planed-sow-injections', sowInjections);
 app.use('/planed-sow-injections', sowInjections);
 
 const injectionPwa = express.Router();
+let pigNewsCache = { expiresAt: 0, items: [] };
+
+injectionPwa.get('/news', requireAuth, async (_req, res, next) => {
+  try {
+    if (pigNewsCache.expiresAt > Date.now() && pigNewsCache.items.length) return res.json(pigNewsCache.items);
+    const queries = [
+      'pig production swine industry innovation when:30d',
+      'swine health technology pig farming when:30d',
+    ];
+    const feeds = await Promise.all(queries.map(async query => {
+      const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en&gl=US&ceid=US:en`;
+      const response = await fetch(url, { signal: AbortSignal.timeout(10000), headers: { 'User-Agent': 'SwinePWA/1.0' } });
+      if (!response.ok) throw new Error(`News provider returned ${response.status}`);
+      return response.text();
+    }));
+    const unique = new Map();
+    for (const xml of feeds) {
+      for (const block of xml.match(/<item>[\s\S]*?<\/item>/gi) || []) {
+        const title = xmlTag(block, 'title');
+        const url = xmlTag(block, 'link');
+        const source = xmlTag(block, 'source') || 'Industry news';
+        const publishedAt = new Date(xmlTag(block, 'pubDate'));
+        if (!title || !url || !/^https:\/\//i.test(url) || Number.isNaN(publishedAt.getTime())) continue;
+        const cleanTitle = title.replace(new RegExp(`\\s+-\\s+${escapeRegExp(source)}$`, 'i'), '').trim();
+        unique.set(cleanTitle.toLocaleLowerCase(), { title: cleanTitle, url, source, published_at: publishedAt.toISOString() });
+      }
+    }
+    const items = [...unique.values()].sort((a, b) => b.published_at.localeCompare(a.published_at)).slice(0, 24);
+    if (!items.length) throw new Error('No current pig production news was returned');
+    pigNewsCache = { expiresAt: Date.now() + 15 * 60 * 1000, items };
+    res.json(items);
+  } catch (error) {
+    if (pigNewsCache.items.length) return res.json(pigNewsCache.items);
+    next(Object.assign(new Error('Pig production news is temporarily unavailable'), { status: 503, cause: error }));
+  }
+});
 
 injectionPwa.get('/history', requireAuth, async (req, res, next) => {
   try {
@@ -875,6 +911,9 @@ function validateDoneAltresyn(body){const groupNumber=Number(String(body.group??
 function doneAltresynValues(value){return[value.group,value.amount,value.extraDoses,value.doneDate,value.givenByUserId];}
 async function removeUnusedUpload(photo){if(!photo)return;const count=await pool.query(`SELECT (SELECT COUNT(*) FROM vet_questions WHERE photo=$1)+(SELECT COUNT(*) FROM daily_remarks WHERE photo=$1)+(SELECT COUNT(*) FROM repair_locations WHERE photo=$1) AS count`,[photo]);if(Number(count.rows[0].count)===0){const name=path.basename(photo);try{await fs.promises.unlink(path.join(uploadDir,name));}catch(e){if(e.code!=='ENOENT')throw e;}}}
 function validStoredName(value){const name=String(value||'');if(!/^[a-f0-9-]{36}(\.[a-z0-9]{1,10})?$/.test(name))throw Object.assign(new Error('Invalid stored file name'),{status:400});return name;}
+function xmlTag(xml,name){const match=xml.match(new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${name}>`,'i'));return match?decodeXml(match[1].replace(/^<!\[CDATA\[|\]\]>$/g,'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim()):'';}
+function decodeXml(value){return String(value).replace(/&#(\d+);/g,(_match,code)=>String.fromCodePoint(Number(code))).replace(/&#x([0-9a-f]+);/gi,(_match,code)=>String.fromCodePoint(Number.parseInt(code,16))).replace(/&(amp|lt|gt|quot|apos);/g,(_match,name)=>({amp:'&',lt:'<',gt:'>',quot:'"',apos:"'"})[name]);}
+function escapeRegExp(value){return String(value).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
 
 function validateUser(body, passwordRequired) {
   const username = String(body.username || '').trim();
