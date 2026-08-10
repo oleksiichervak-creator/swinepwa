@@ -474,7 +474,7 @@ altersyn.get('/', requireAuth, async (_req, res, next) => {
 });
 altersyn.post('/', requireAuth, requireAdmin, async (req, res, next) => {
   try {
-    const input = validateAltersyn(req.body,validAltersynYear(req.body.schedule_year));
+    const input = validateAltresyn(req.body,validAltresynYear(req.body.schedule_year));
     const result = await pool.query(`INSERT INTO altersyn
       ("group",ventil,amount,juice_start_date,juice_stop_date,altersyn_start_date,altersyn_stop_date)
       VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id`, altersynValues(input));
@@ -484,20 +484,20 @@ altersyn.post('/', requireAuth, requireAdmin, async (req, res, next) => {
 altersyn.get('/print/:id', requireAuth, async (req, res, next) => {
   try {
     const record=(await pool.query(altersynSelect+' WHERE id=$1',[req.params.id])).rows[0];
-    if(!record)return res.status(404).send('Altersyn record not found');
+    if(!record)return res.status(404).send('Altresyn record not found');
     const date=value=>{const normalized=normalizeDate(value);return `${normalized.slice(8,10)}.${normalized.slice(5,7)}`;};
-    res.type('html').send(`<!doctype html><html><head><meta charset="utf-8"><title>Altersyn group ${html(record.group)}</title><style>
+    res.type('html').send(`<!doctype html><html><head><meta charset="utf-8"><title>Altresyn group ${html(record.group)}</title><style>
       @page{size:A4 landscape;margin:0}*{box-sizing:border-box}html,body{margin:0;width:297mm;height:210mm;font-family:Arial,sans-serif;color:#102c20;background:#fff}
       .page{width:297mm;height:210mm}.half{width:148.5mm;height:210mm;padding:7mm;display:flex;flex-direction:column;gap:5mm;border-right:1px dashed #aaa;overflow:hidden}
       .group{text-align:center;border:4px solid #173f2e;border-radius:7mm;padding:3mm;background:#e9f3ec}.group small{display:block;font-size:18pt;font-weight:800;letter-spacing:.14em}.group strong{display:block;font-size:70pt;line-height:.9;font-weight:900}
       .treatment{flex:1;display:flex;flex-direction:column;justify-content:center;border:4px solid #173f2e;border-radius:7mm;padding:3mm;background:#fff}.treatment.altersyn{background:#dcece2}
       h2{margin:0 0 3mm;text-align:center;font-size:32pt;line-height:1;font-weight:900;letter-spacing:.06em}.dates{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:2mm;text-align:center}.date-label{display:block;font-size:14pt;font-weight:800;text-transform:uppercase}.date-value{display:block;margin-top:1mm;font-size:46pt;line-height:.9;font-weight:900;letter-spacing:-.04em}.arrow{font-size:30pt;font-weight:900}
       .print{position:fixed;right:12px;top:12px;border:0;border-radius:8px;padding:10px 16px;background:#173f2e;color:#fff;font-weight:bold}@media print{.print{display:none}}
-    </style></head><body><button class="print" onclick="print()">Print</button><main class="page"><section class="half"><div class="group"><small>GROUP</small><strong>${html(record.group)}</strong></div><div class="treatment"><h2>JUICE</h2><div class="dates"><div><span class="date-label">Start</span><span class="date-value">${date(record.juice_start_date)}</span></div><span class="arrow">→</span><div><span class="date-label">Stop</span><span class="date-value">${date(record.juice_stop_date)}</span></div></div></div><div class="treatment altersyn"><h2>ALTERSYN</h2><div class="dates"><div><span class="date-label">Start</span><span class="date-value">${date(record.altersyn_start_date)}</span></div><span class="arrow">→</span><div><span class="date-label">Stop</span><span class="date-value">${date(record.altersyn_stop_date)}</span></div></div></div></section></main></body></html>`);
+    </style></head><body><button class="print" onclick="print()">Print</button><main class="page"><section class="half"><div class="group"><small>GROUP</small><strong>${html(record.group)}</strong></div><div class="treatment"><h2>JUICE</h2><div class="dates"><div><span class="date-label">Start</span><span class="date-value">${date(record.juice_start_date)}</span></div><span class="arrow">→</span><div><span class="date-label">Stop</span><span class="date-value">${date(record.juice_stop_date)}</span></div></div></div><div class="treatment altersyn"><h2>ALTRESYN</h2><div class="dates"><div><span class="date-label">Start</span><span class="date-value">${date(record.altersyn_start_date)}</span></div><span class="arrow">→</span><div><span class="date-label">Stop</span><span class="date-value">${date(record.altersyn_stop_date)}</span></div></div></div></section></main></body></html>`);
   } catch (error) { next(error); }
 });
 altersyn.get('/:id', requireAuth, async (req, res, next) => {
-  try { const result=await pool.query(altersynSelect+' WHERE id=$1',[req.params.id]);if(!result.rows[0])return res.status(404).json({error:'Altersyn record not found'});res.json(result.rows[0]); }
+  try { const result=await pool.query(altersynSelect+' WHERE id=$1',[req.params.id]);if(!result.rows[0])return res.status(404).json({error:'Altresyn record not found'});res.json(result.rows[0]); }
   catch (error) { next(error); }
 });
 altersyn.patch('/:id', requireAuth, requireAdmin, async (req, res, next) => {
@@ -505,31 +505,31 @@ altersyn.patch('/:id', requireAuth, requireAdmin, async (req, res, next) => {
     const fields=['group','ventil','amount','juice_start_date','juice_stop_date','altersyn_start_date','altersyn_stop_date'];
     if(!fields.some(field=>Object.hasOwn(req.body,field)))return res.status(400).json({error:'No fields to update'});
     const current=await pool.query('SELECT "group" AS "group",ventil,amount,juice_start_date,juice_stop_date,altersyn_start_date,altersyn_stop_date FROM altersyn WHERE id=$1',[req.params.id]);
-    if(!current.rows[0])return res.status(404).json({error:'Altersyn record not found'});
+    if(!current.rows[0])return res.status(404).json({error:'Altresyn record not found'});
     const currentYear=Number(String(current.rows[0].altersyn_stop_date).slice(0,4));
-    const scheduleYear=req.body.schedule_year==null?(Object.hasOwn(req.body,'group')?new Date().getUTCFullYear():currentYear):validAltersynYear(req.body.schedule_year);
-    const input=validateAltersyn({...current.rows[0],...req.body},scheduleYear);
+    const scheduleYear=req.body.schedule_year==null?(Object.hasOwn(req.body,'group')?new Date().getUTCFullYear():currentYear):validAltresynYear(req.body.schedule_year);
+    const input=validateAltresyn({...current.rows[0],...req.body},scheduleYear);
     await pool.query(`UPDATE altersyn SET "group"=$1,ventil=$2,amount=$3,juice_start_date=$4,juice_stop_date=$5,
       altersyn_start_date=$6,altersyn_stop_date=$7,updated_at=NOW() WHERE id=$8`,[...altersynValues(input),req.params.id]);
     res.json((await pool.query(altersynSelect+' WHERE id=$1',[req.params.id])).rows[0]);
   } catch (error) { handleDbError(error, res, next); }
 });
 altersyn.delete('/:id', requireAuth, requireAdmin, async (req, res, next) => {
-  try { const result=await pool.query('DELETE FROM altersyn WHERE id=$1 RETURNING id',[req.params.id]);if(!result.rows[0])return res.status(404).json({error:'Altersyn record not found'});res.status(204).end(); }
+  try { const result=await pool.query('DELETE FROM altersyn WHERE id=$1 RETURNING id',[req.params.id]);if(!result.rows[0])return res.status(404).json({error:'Altresyn record not found'});res.status(204).end(); }
   catch (error) { next(error); }
 });
 app.use('/api/altersyn',altersyn);app.use('/altersyn',altersyn);
 
-const doneAltersyn=express.Router();
-const doneAltersynSelect=`SELECT d.id,d."group" AS "group",d.amount,d.extra_doses,d.total_altersyn_ml,
+const doneAltresyn=express.Router();
+const doneAltresynSelect=`SELECT d.id,d."group" AS "group",d.amount,d.extra_doses,d.total_altersyn_ml,
   d.done_date,d.given_by_user_id,u.username AS given_by_username,d.created_at,d.updated_at
   FROM donealtersyn d JOIN users u ON u.id=d.given_by_user_id`;
-doneAltersyn.get('/',requireAuth,async(_req,res,next)=>{try{res.json((await pool.query(doneAltersynSelect+' ORDER BY d.done_date DESC,d.id DESC')).rows);}catch(error){next(error);}});
-doneAltersyn.post('/',requireAuth,requireAdmin,async(req,res,next)=>{try{const input=validateDoneAltersyn(req.body);const result=await pool.query(`INSERT INTO donealtersyn("group",amount,extra_doses,done_date,given_by_user_id) VALUES($1,$2,$3,$4,$5) RETURNING id`,doneAltersynValues(input));res.status(201).json((await pool.query(doneAltersynSelect+' WHERE d.id=$1',[result.rows[0].id])).rows[0]);}catch(error){handleDbError(error,res,next);}});
-doneAltersyn.get('/:id',requireAuth,async(req,res,next)=>{try{const result=await pool.query(doneAltersynSelect+' WHERE d.id=$1',[req.params.id]);if(!result.rows[0])return res.status(404).json({error:'Done Altersyn record not found'});res.json(result.rows[0]);}catch(error){next(error);}});
-doneAltersyn.patch('/:id',requireAuth,requireAdmin,async(req,res,next)=>{try{const fields=['group','amount','extra_doses','done_date','given_by_user_id'];if(!fields.some(field=>Object.hasOwn(req.body,field)))return res.status(400).json({error:'No fields to update'});const current=await pool.query('SELECT "group" AS "group",amount,extra_doses,done_date,given_by_user_id FROM donealtersyn WHERE id=$1',[req.params.id]);if(!current.rows[0])return res.status(404).json({error:'Done Altersyn record not found'});const input=validateDoneAltersyn({...current.rows[0],...req.body});await pool.query('UPDATE donealtersyn SET "group"=$1,amount=$2,extra_doses=$3,done_date=$4,given_by_user_id=$5,updated_at=NOW() WHERE id=$6',[...doneAltersynValues(input),req.params.id]);res.json((await pool.query(doneAltersynSelect+' WHERE d.id=$1',[req.params.id])).rows[0]);}catch(error){handleDbError(error,res,next);}});
-doneAltersyn.delete('/:id',requireAuth,requireAdmin,async(req,res,next)=>{try{const result=await pool.query('DELETE FROM donealtersyn WHERE id=$1 RETURNING id',[req.params.id]);if(!result.rows[0])return res.status(404).json({error:'Done Altersyn record not found'});res.status(204).end();}catch(error){next(error);}});
-app.use('/api/done-altersyn',doneAltersyn);app.use('/done-altersyn',doneAltersyn);
+doneAltresyn.get('/',requireAuth,async(_req,res,next)=>{try{res.json((await pool.query(doneAltresynSelect+' ORDER BY d.done_date DESC,d.id DESC')).rows);}catch(error){next(error);}});
+doneAltresyn.post('/',requireAuth,requireAdmin,async(req,res,next)=>{try{const input=validateDoneAltresyn(req.body);const result=await pool.query(`INSERT INTO donealtersyn("group",amount,extra_doses,done_date,given_by_user_id) VALUES($1,$2,$3,$4,$5) RETURNING id`,doneAltresynValues(input));res.status(201).json((await pool.query(doneAltresynSelect+' WHERE d.id=$1',[result.rows[0].id])).rows[0]);}catch(error){handleDbError(error,res,next);}});
+doneAltresyn.get('/:id',requireAuth,async(req,res,next)=>{try{const result=await pool.query(doneAltresynSelect+' WHERE d.id=$1',[req.params.id]);if(!result.rows[0])return res.status(404).json({error:'Done Altresyn record not found'});res.json(result.rows[0]);}catch(error){next(error);}});
+doneAltresyn.patch('/:id',requireAuth,requireAdmin,async(req,res,next)=>{try{const fields=['group','amount','extra_doses','done_date','given_by_user_id'];if(!fields.some(field=>Object.hasOwn(req.body,field)))return res.status(400).json({error:'No fields to update'});const current=await pool.query('SELECT "group" AS "group",amount,extra_doses,done_date,given_by_user_id FROM donealtersyn WHERE id=$1',[req.params.id]);if(!current.rows[0])return res.status(404).json({error:'Done Altresyn record not found'});const input=validateDoneAltresyn({...current.rows[0],...req.body});await pool.query('UPDATE donealtersyn SET "group"=$1,amount=$2,extra_doses=$3,done_date=$4,given_by_user_id=$5,updated_at=NOW() WHERE id=$6',[...doneAltresynValues(input),req.params.id]);res.json((await pool.query(doneAltresynSelect+' WHERE d.id=$1',[req.params.id])).rows[0]);}catch(error){handleDbError(error,res,next);}});
+doneAltresyn.delete('/:id',requireAuth,requireAdmin,async(req,res,next)=>{try{const result=await pool.query('DELETE FROM donealtersyn WHERE id=$1 RETURNING id',[req.params.id]);if(!result.rows[0])return res.status(404).json({error:'Done Altresyn record not found'});res.status(204).end();}catch(error){next(error);}});
+app.use('/api/done-altersyn',doneAltresyn);app.use('/done-altersyn',doneAltresyn);
 
 const todos=express.Router();const todoSelect='SELECT id,task,due_date,is_completed,completed_at,created_at,updated_at FROM todo_items';
 todos.get('/',requireAuth,async(req,res,next)=>{try{const values=[];let where='';if(req.query.completed!==undefined){if(!['true','false'].includes(String(req.query.completed)))return res.status(400).json({error:'completed must be true or false'});values.push(req.query.completed==='true');where=' WHERE is_completed=$1';}res.json((await pool.query(todoSelect+where+' ORDER BY is_completed,due_date,id',values)).rows);}catch(e){next(e);}});
@@ -648,12 +648,12 @@ injectionPwa.post('/altersyn/:id/complete', requireAuth, async (req, res, next) 
     if (!Number.isInteger(extraDoses) || extraDoses < 0) return res.status(400).json({ error: 'Extra doses must be a non-negative whole number' });
     const record = (await pool.query(`SELECT id,"group" AS "group",amount FROM altersyn
       WHERE id=$1 AND $2 BETWEEN altersyn_start_date AND altersyn_stop_date`, [req.params.id, date])).rows[0];
-    if (!record) return res.status(404).json({ error: 'No active Altersyn group was found for this date' });
+    if (!record) return res.status(404).json({ error: 'No active Altresyn group was found for this date' });
     const duplicate = await pool.query('SELECT id FROM donealtersyn WHERE "group"=$1 AND done_date=$2', [record.group, date]);
-    if (duplicate.rows[0]) return res.status(409).json({ error: 'This Altersyn group is already completed for today' });
+    if (duplicate.rows[0]) return res.status(409).json({ error: 'This Altresyn group is already completed for today' });
     const inserted = await pool.query(`INSERT INTO donealtersyn("group",amount,extra_doses,done_date,given_by_user_id)
       VALUES($1,$2,$3,$4,$5) RETURNING id`, [record.group, record.amount, extraDoses, date, req.user.sub]);
-    res.status(201).json((await pool.query(doneAltersynSelect+' WHERE d.id=$1',[inserted.rows[0].id])).rows[0]);
+    res.status(201).json((await pool.query(doneAltresynSelect+' WHERE d.id=$1',[inserted.rows[0].id])).rows[0]);
   } catch (error) { handleDbError(error, res, next); }
 });
 
@@ -867,12 +867,12 @@ function validateVetQuestion(b){const date=normalizeDate(b.question_date,'Questi
 function validateDailyRemark(b){const date=normalizeDate(b.remark_date,'Remark date'),remark=typeof b.remark==='string'?b.remark.trim():'',photo=b.photo==null||b.photo===''?null:String(b.photo).trim();if(!remark)throw Object.assign(new Error('Remark is required'),{status:400});if(photo&&!/^\/uploads\/[a-f0-9-]+\.(jpg|png|webp)$/.test(photo))throw Object.assign(new Error('Invalid photo path'),{status:400});return{date,remark,photo};}
 function validateRepairLocation(b){const date=normalizeDate(b.repair_date,'Repair date'),location=typeof b.location==='string'?b.location.trim():'',comment=b.comment==null||b.comment===''?null:String(b.comment).trim(),photo=b.photo==null||b.photo===''?null:String(b.photo).trim();if(!location||location.length>300)throw Object.assign(new Error('Location is required and must not exceed 300 characters'),{status:400});if(photo&&!/^\/uploads\/[a-f0-9-]+\.(jpg|png|webp)$/.test(photo))throw Object.assign(new Error('Invalid photo path'),{status:400});return{date,location,comment,photo};}
 function validateTodo(b){const task=typeof b.task==='string'?b.task.trim():'',dueDate=normalizeDate(b.due_date,'Due date'),completed=b.is_completed===true||b.is_completed==='true';if(!task)throw Object.assign(new Error('Task is required'),{status:400});if(task.length>2000)throw Object.assign(new Error('Task must not exceed 2000 characters'),{status:400});return{task,dueDate,completed};}
-function validateAltersyn(body,scheduleYear=new Date().getUTCFullYear()){const groupNumber=Number(String(body.group??'').trim()),ventil=typeof body.ventil==='string'?body.ventil.trim():'',amount=Number(body.amount);if(!Number.isInteger(groupNumber)||groupNumber<1||groupNumber>53)throw Object.assign(new Error('Group must be an ISO week number from 1 to 53'),{status:400});if(!ventil||ventil.length>150)throw Object.assign(new Error('Ventil is required and must not exceed 150 characters'),{status:400});if(!Number.isInteger(amount)||amount<0)throw Object.assign(new Error('Amount must be a non-negative whole number'),{status:400});const dates=altersynDatesForWeek(scheduleYear,groupNumber);return{group:String(groupNumber),ventil,amount,...dates};}
+function validateAltresyn(body,scheduleYear=new Date().getUTCFullYear()){const groupNumber=Number(String(body.group??'').trim()),ventil=typeof body.ventil==='string'?body.ventil.trim():'',amount=Number(body.amount);if(!Number.isInteger(groupNumber)||groupNumber<1||groupNumber>53)throw Object.assign(new Error('Group must be an ISO week number from 1 to 53'),{status:400});if(!ventil||ventil.length>150)throw Object.assign(new Error('Ventil is required and must not exceed 150 characters'),{status:400});if(!Number.isInteger(amount)||amount<0)throw Object.assign(new Error('Amount must be a non-negative whole number'),{status:400});const dates=altersynDatesForWeek(scheduleYear,groupNumber);return{group:String(groupNumber),ventil,amount,...dates};}
 function altersynValues(value){return[value.group,value.ventil,value.amount,value.juiceStartDate,value.juiceStopDate,value.altersynStartDate,value.altersynStopDate];}
-function validAltersynYear(value){if(value==null||value==='')return new Date().getUTCFullYear();const year=Number(value);if(!Number.isInteger(year)||year<2000||year>2100)throw Object.assign(new Error('Schedule year must be between 2000 and 2100'),{status:400});return year;}
+function validAltresynYear(value){if(value==null||value==='')return new Date().getUTCFullYear();const year=Number(value);if(!Number.isInteger(year)||year<2000||year>2100)throw Object.assign(new Error('Schedule year must be between 2000 and 2100'),{status:400});return year;}
 function altersynDatesForWeek(year,week){const jan4=new Date(Date.UTC(year,0,4)),jan4Day=jan4.getUTCDay()||7,monday=new Date(jan4);monday.setUTCDate(jan4.getUTCDate()-(jan4Day-1)+(week-1)*7);const weekThursday=new Date(monday);weekThursday.setUTCDate(monday.getUTCDate()+3);if(weekThursday.getUTCFullYear()!==year)throw Object.assign(new Error(`Week ${week} does not exist in ${year}`),{status:400});const dateAtOffset=offset=>{const date=new Date(monday);date.setUTCDate(monday.getUTCDate()+offset);return date.toISOString().slice(0,10);};return{altersynStopDate:dateAtOffset(-4),altersynStartDate:dateAtOffset(-21),juiceStopDate:dateAtOffset(-22),juiceStartDate:dateAtOffset(-25)};}
-function validateDoneAltersyn(body){const groupNumber=Number(String(body.group??'').trim()),amount=Number(body.amount),extraDoses=Number(body.extra_doses),doneDate=normalizeDate(body.done_date,'Date'),givenByUserId=Number(body.given_by_user_id);if(!Number.isInteger(groupNumber)||groupNumber<1||groupNumber>53)throw Object.assign(new Error('Group must be a week number from 1 to 53'),{status:400});if(!Number.isInteger(amount)||amount<0)throw Object.assign(new Error('Amount must be a non-negative whole number'),{status:400});if(!Number.isInteger(extraDoses)||extraDoses<0)throw Object.assign(new Error('Extra doses must be a non-negative whole number'),{status:400});if(!Number.isInteger(givenByUserId)||givenByUserId<1)throw Object.assign(new Error('A valid user is required'),{status:400});return{group:String(groupNumber),amount,extraDoses,doneDate,givenByUserId};}
-function doneAltersynValues(value){return[value.group,value.amount,value.extraDoses,value.doneDate,value.givenByUserId];}
+function validateDoneAltresyn(body){const groupNumber=Number(String(body.group??'').trim()),amount=Number(body.amount),extraDoses=Number(body.extra_doses),doneDate=normalizeDate(body.done_date,'Date'),givenByUserId=Number(body.given_by_user_id);if(!Number.isInteger(groupNumber)||groupNumber<1||groupNumber>53)throw Object.assign(new Error('Group must be a week number from 1 to 53'),{status:400});if(!Number.isInteger(amount)||amount<0)throw Object.assign(new Error('Amount must be a non-negative whole number'),{status:400});if(!Number.isInteger(extraDoses)||extraDoses<0)throw Object.assign(new Error('Extra doses must be a non-negative whole number'),{status:400});if(!Number.isInteger(givenByUserId)||givenByUserId<1)throw Object.assign(new Error('A valid user is required'),{status:400});return{group:String(groupNumber),amount,extraDoses,doneDate,givenByUserId};}
+function doneAltresynValues(value){return[value.group,value.amount,value.extraDoses,value.doneDate,value.givenByUserId];}
 async function removeUnusedUpload(photo){if(!photo)return;const count=await pool.query(`SELECT (SELECT COUNT(*) FROM vet_questions WHERE photo=$1)+(SELECT COUNT(*) FROM daily_remarks WHERE photo=$1)+(SELECT COUNT(*) FROM repair_locations WHERE photo=$1) AS count`,[photo]);if(Number(count.rows[0].count)===0){const name=path.basename(photo);try{await fs.promises.unlink(path.join(uploadDir,name));}catch(e){if(e.code!=='ENOENT')throw e;}}}
 function validStoredName(value){const name=String(value||'');if(!/^[a-f0-9-]{36}(\.[a-z0-9]{1,10})?$/.test(name))throw Object.assign(new Error('Invalid stored file name'),{status:400});return name;}
 

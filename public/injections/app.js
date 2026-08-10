@@ -32,16 +32,30 @@ async function api(path, options = {}) {
 }
 
 async function loadUsers() {
-  const select = $('#login-user');
+  const grid = $('#login-users');
   try {
     const users = await api('/api/auth/users');
-    select.innerHTML = users.length
-      ? users.map(user => `<option value="${escapeHtml(user.username)}">${escapeHtml(user.username)}</option>`).join('')
-      : '<option value="">No users available</option>';
+    grid.innerHTML = users.length
+      ? users.map(user => `<button class="user-button" type="button" data-username="${escapeHtml(user.username)}"><span>${escapeHtml(userInitials(user.username))}</span><strong>${escapeHtml(user.username)}</strong></button>`).join('')
+      : '<span>No users available</span>';
+    grid.querySelectorAll('.user-button').forEach(button => button.addEventListener('click', () => selectLoginUser(button)));
+    if (users.length) selectLoginUser(grid.querySelector('.user-button'));
   } catch (error) {
-    select.innerHTML = '<option value="">Unable to load users</option>';
+    grid.innerHTML = '<span>Unable to load users</span>';
     $('#login-error').textContent = error.message;
   }
+}
+
+function selectLoginUser(button) {
+  $('#login-user').value = button.dataset.username;
+  document.querySelectorAll('.user-button').forEach(item => item.classList.toggle('selected', item === button));
+  $('#login-password').value = '';
+  $('#login-error').textContent = '';
+}
+
+function userInitials(username) {
+  const parts = String(username).trim().split(/\s+/).filter(Boolean);
+  return (parts.length > 1 ? parts[0][0] + parts.at(-1)[0] : parts[0]?.slice(0, 2) || '?').toUpperCase();
 }
 
 $('#login-form').addEventListener('submit', async event => {
@@ -274,8 +288,6 @@ $('#pin-keypad').addEventListener('click', event => {
   $('#login-error').textContent = '';
 });
 
-$('#login-user').addEventListener('change', () => { $('#login-password').value = ''; });
-
 function courseLabel(medicine) {
   const days = Math.max(1, Number(medicine.course_days) || 0);
   return `${days} day${days === 1 ? '' : 's'}`;
@@ -320,8 +332,8 @@ async function loadToday() {
     todayItems.sort(comparePens);
     renderMedicineSummary();
     list.innerHTML = todayItems.length ? todayItems.map(item => `
-      <article class="injection-card">
-        <header><h2>Sow ${escapeHtml(item.sow_number)}</h2><strong>${escapeHtml(item.pen_name)}</strong></header>
+      <article class="injection-card today-injection-card">
+        <header><div><small class="pen-label">PEN</small><h2 class="pen-number">${escapeHtml(item.pen_name)}</h2></div><strong class="sow-number">Sow ${escapeHtml(item.sow_number)}</strong></header>
         <div class="medicine">${escapeHtml(item.medicine_name)}</div>
         <div class="meta"><span>Dose: <strong>${item.dose_ml} ml</strong></span><span>${escapeHtml(item.comment || 'No comment')}</span></div>
         <div class="card-actions">
@@ -353,10 +365,10 @@ async function loadAltersynToday() {
       <article class="injection-card altersyn-card" data-altersyn-id="${item.id}">
         <header><h2>Group ${escapeHtml(item.group)}</h2><span class="status ${item.completed ? 'done' : 'planned'}">${item.completed ? 'Done' : 'Today'}</span></header>
         <div class="altersyn-details"><div><span>Ventil</span><strong>${escapeHtml(item.ventil)}</strong></div><div><span>Amount</span><strong>${item.amount}</strong></div></div>
-        ${item.completed ? '<p class="completed-note">Altersyn has already been registered today.</p>' : `
+        ${item.completed ? '<p class="completed-note">Altresyn has already been registered today.</p>' : `
           <div class="extra-dose-row"><span>Extra doses</span><div class="stepper"><button type="button" data-extra-minus aria-label="Decrease extra doses">−</button><output>2</output><button type="button" data-extra-plus aria-label="Increase extra doses">+</button></div></div>
           <button class="complete-button" type="button" data-altersyn-done>Done</button>`}
-      </article>`).join('') : '<div class="empty">No Altersyn treatment scheduled for today.</div>';
+      </article>`).join('') : '<div class="empty">No Altresyn treatment scheduled for today.</div>';
     list.querySelectorAll('.altersyn-card').forEach(card => {
       const output = card.querySelector('output');
       card.querySelector('[data-extra-minus]')?.addEventListener('click', () => { output.value = Math.max(0, Number(output.value) - 1); });
@@ -375,7 +387,7 @@ async function completeAltersyn(id, extraDoses, button) {
       method: 'POST', body: JSON.stringify({ done_date: localDate(), extra_doses: extraDoses }),
     });
     await loadAltersynToday();
-    toast('Altersyn registered');
+    toast('Altresyn registered');
   } catch (error) {
     toast(error.message);
     button.disabled = false;

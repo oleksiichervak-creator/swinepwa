@@ -9,6 +9,7 @@
   <link rel="icon" href="/injections/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/injections/styles.css">
   <style>.sow-info-icon{background:#e3e8f5;color:#334f8f;font-size:25px;font-weight:950}.info-search{margin-bottom:14px}.info-search label{margin-bottom:12px}.sow-info-heading{display:grid;grid-template-columns:1fr auto;align-items:end;padding:4px 3px}.sow-info-heading span,.sow-info-heading small{color:#64766b;font-size:12px;font-weight:750}.sow-info-heading strong{grid-row:2;font-size:24px}.sow-info-heading small{grid-column:2;grid-row:2}.info-details{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.info-details div{display:grid;gap:2px;padding:9px;border-radius:10px;background:#eef5f0}.info-details span{color:#64766b;font-size:10px;font-weight:750;text-transform:uppercase}.info-details strong{font-size:13px}.info-comment{margin:10px 0 0;padding:9px 11px;border-left:3px solid #9bb7a5;background:#f6f9f7;color:#52675b;font-size:12px}</style>
+  <style>.user-picker{min-width:0;margin:0 0 18px;padding:0;border:0}.user-picker legend{margin-bottom:9px;color:#33483c;font-size:13px;font-weight:750}.user-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.user-button{display:grid;justify-items:center;gap:7px;min-width:0;padding:11px 5px;border:2px solid transparent;border-radius:15px;background:#eef4f0;color:#294838}.user-button span{display:grid;place-items:center;width:48px;height:48px;border-radius:50%;background:#d3e4d8;color:#245c43;font-size:17px;font-weight:900}.user-button strong{max-width:100%;overflow:hidden;text-overflow:ellipsis;font-size:12px}.user-button.selected{border-color:#245c43;background:#fff;box-shadow:0 5px 15px #245c4320}.user-button.selected span{background:#245c43;color:#fff}.today-injection-card{border-left:6px solid #245c43}.today-injection-card header{align-items:center}.pen-label{display:block;color:#6b7c72;font-size:10px;font-weight:900;letter-spacing:.14em}.today-injection-card .pen-number{font-size:38px;line-height:1;color:#173f2e}.sow-number{padding:7px 9px;border-radius:9px;background:#eef5f0;font-size:13px}</style>
   <title>Sow Injections</title>
 </head>
 <body>
@@ -19,11 +20,8 @@
       <h1>Sow Injections</h1>
       <p class="intro">Sign in to plan and register treatments.</p>
       <form id="login-form" class="panel">
-        <label>User
-          <select id="login-user" required>
-            <option value="">Loading users…</option>
-          </select>
-        </label>
+        <fieldset class="user-picker"><legend>Choose user</legend><div id="login-users" class="user-grid"><span>Loading users…</span></div></fieldset>
+        <input id="login-user" type="hidden">
         <label>Password
           <input id="login-password" class="pin-display" type="password" required readonly inputmode="none" autocomplete="off" aria-label="Numeric password">
         </label>
@@ -60,7 +58,7 @@
           </button>
           <button id="show-altersyn-today" class="choice-card accent" type="button">
             <span class="choice-icon altersyn-icon" aria-hidden="true">A</span>
-            <span><strong>Altersyn for today</strong><small>Register today's Altersyn treatment</small></span>
+            <span><strong>Altresyn for today</strong><small>Register today's Altresyn treatment</small></span>
           </button>
           <button id="show-sow-info" class="choice-card accent" type="button">
             <span class="choice-icon sow-info-icon" aria-hidden="true">i</span>
