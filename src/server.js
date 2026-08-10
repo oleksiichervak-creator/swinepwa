@@ -600,29 +600,31 @@ let pigNewsCache = { expiresAt: 0, items: [] };
 injectionPwa.get('/news', requireAuth, async (_req, res, next) => {
   try {
     if (pigNewsCache.expiresAt > Date.now() && pigNewsCache.items.length) return res.json(pigNewsCache.items);
-    const queries = [
-      'pig production swine industry innovation when:30d',
-      'swine health technology pig farming when:30d',
+    const feedsToLoad = [
+      { region: 'Denmark', priority: 0, query: 'Denmark Danish pig production pork swine innovation when:60d' },
+      { region: 'Europe', priority: 1, query: 'Europe EU pig production swine industry innovation when:30d' },
+      { region: 'World', priority: 2, query: 'pig production swine health technology innovation when:30d' },
     ];
-    const feeds = await Promise.all(queries.map(async query => {
-      const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en&gl=US&ceid=US:en`;
+    const feeds = await Promise.all(feedsToLoad.map(async feed => {
+      const url = `https://news.google.com/rss/search?q=${encodeURIComponent(feed.query)}&hl=en&gl=US&ceid=US:en`;
       const response = await fetch(url, { signal: AbortSignal.timeout(10000), headers: { 'User-Agent': 'SwinePWA/1.0' } });
       if (!response.ok) throw new Error(`News provider returned ${response.status}`);
-      return response.text();
+      return { ...feed, xml: await response.text() };
     }));
     const unique = new Map();
-    for (const xml of feeds) {
-      for (const block of xml.match(/<item>[\s\S]*?<\/item>/gi) || []) {
+    for (const feed of feeds.sort((a,b) => a.priority - b.priority)) {
+      for (const block of feed.xml.match(/<item>[\s\S]*?<\/item>/gi) || []) {
         const title = xmlTag(block, 'title');
         const url = xmlTag(block, 'link');
         const source = xmlTag(block, 'source') || 'Industry news';
         const publishedAt = new Date(xmlTag(block, 'pubDate'));
         if (!title || !url || !/^https:\/\//i.test(url) || Number.isNaN(publishedAt.getTime())) continue;
         const cleanTitle = title.replace(new RegExp(`\\s+-\\s+${escapeRegExp(source)}$`, 'i'), '').trim();
-        unique.set(cleanTitle.toLocaleLowerCase(), { title: cleanTitle, url, source, published_at: publishedAt.toISOString() });
+        const key = cleanTitle.toLocaleLowerCase();
+        if (!unique.has(key)) unique.set(key, { title: cleanTitle, url, source, region: feed.region, priority: feed.priority, published_at: publishedAt.toISOString() });
       }
     }
-    const items = [...unique.values()].sort((a, b) => b.published_at.localeCompare(a.published_at)).slice(0, 24);
+    const items = [...unique.values()].sort((a, b) => a.priority - b.priority || b.published_at.localeCompare(a.published_at)).slice(0, 30).map(({priority,...item})=>item);
     if (!items.length) throw new Error('No current pig production news was returned');
     pigNewsCache = { expiresAt: Date.now() + 15 * 60 * 1000, items };
     res.json(items);
