@@ -109,7 +109,7 @@ function signOut() {
 }
 
 function showScreen(name) {
-  for (const screen of ['home', 'plan', 'today', 'altersyn-today', 'sow-info', 'pig-news']) $(`#${screen}-screen`).hidden = screen !== name;
+  for (const screen of ['home', 'plan', 'today', 'altersyn-today', 'sow-info']) $(`#${screen}-screen`).hidden = screen !== name;
   $('#back-button').hidden = name === 'home';
   $('#screen-title').textContent = '';
   $('#logout-button').hidden = name !== 'home';
@@ -422,28 +422,6 @@ function formatHistoryDate(value) {
   return year && month && day ? `${day}.${month}.${year}` : escapeHtml(value);
 }
 
-async function loadPigNews() {
-  const list = $('#pig-news-list');
-  const refresh = $('#refresh-pig-news');
-  refresh.disabled = true;
-  list.innerHTML = '<div class="empty">Loading the latest news…</div>';
-  try {
-    const items = await api('/api/injection-pwa/news');
-    list.innerHTML = items.map(item => `<a class="news-card" href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">
-      <div class="news-meta"><span>${escapeHtml(item.source)}</span><time datetime="${escapeHtml(item.published_at)}">${formatNewsDate(item.published_at)}</time></div>
-      <h3>${escapeHtml(item.title)}</h3><span class="read-story">Read full story <b aria-hidden="true">→</b></span>
-    </a>`).join('');
-  } catch (error) {
-    list.innerHTML = `<div class="empty">${escapeHtml(error.message)}<br><small>Please try again later.</small></div>`;
-  } finally {
-    refresh.disabled = false;
-  }
-}
-
-function formatNewsDate(value) {
-  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(value));
-}
-
 function comparePens(left, right) {
   const a = String(left.pen_name).trim();
   const b = String(right.pen_name).trim();
@@ -532,8 +510,6 @@ $('#sow-info-form').addEventListener('submit', event => {
   const sowNumber = event.currentTarget.sow_number.value.trim();
   if (sowNumber) loadSowInfo(sowNumber);
 });
-$('#show-pig-news').addEventListener('click', () => { showScreen('pig-news'); loadPigNews(); });
-$('#refresh-pig-news').addEventListener('click', loadPigNews);
 $('#back-button').addEventListener('click', () => showScreen('home'));
 $('#logout-button').addEventListener('click', signOut);
 $('#complete-close').addEventListener('click', () => $('#complete-dialog').close());
