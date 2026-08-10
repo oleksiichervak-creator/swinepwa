@@ -33,7 +33,7 @@ async function showAdmin() {
     $('#add-done-altersyn').hidden = me.role !== 'admin';
     $('#add-todo').hidden = me.role !== 'admin';
     await Promise.all([loadUsers(), loadDepartments(), loadRooms(), loadPens(), loadMedicineSow(), loadMedicineSowStorage(), loadSowInjections(), loadDoneSow(), loadVetQuestions(), loadFiles(), loadDailyRemarks(), loadRepairLocations(), loadAltresyn(), loadDoneAltresyn(), loadTodos()]);
-    const requestedPage = ['#departments','#rooms','#pens','#medicine-sow','#medicine-sow-storage','#sow-injections','#done-sow','#vet-questions','#file-storage','#daily-remarks','#repair-locations','#altersyn','#done-altersyn','#todos','#pig-news'].includes(location.hash) ? location.hash.slice(1) : 'users';
+    const requestedPage = ['#departments','#rooms','#pens','#medicine-sow','#medicine-sow-storage','#sow-injections','#done-sow','#vet-questions','#file-storage','#daily-remarks','#repair-locations','#altersyn','#done-altersyn','#todos','#pig-news','#pig-game'].includes(location.hash) ? location.hash.slice(1) : 'users';
     switchPage(requestedPage);
   } catch { logout(); }
 }
@@ -157,7 +157,7 @@ function switchPage(page) {
     const active = item.dataset.page === page;
     item.classList.toggle('active', active); item.setAttribute('aria-selected', String(active));
   });
-  $('#users-page').hidden=page!=='users';$('#departments-page').hidden=page!=='departments';$('#rooms-page').hidden=page!=='rooms';$('#pens-page').hidden=page!=='pens';$('#medicine-sow-page').hidden=page!=='medicine-sow';$('#medicine-sow-storage-page').hidden=page!=='medicine-sow-storage';$('#sow-injections-page').hidden=page!=='sow-injections';$('#done-sow-page').hidden=page!=='done-sow';$('#vet-questions-page').hidden=page!=='vet-questions';$('#file-storage-page').hidden=page!=='file-storage';$('#daily-remarks-page').hidden=page!=='daily-remarks';$('#repair-locations-page').hidden=page!=='repair-locations';$('#altersyn-page').hidden=page!=='altersyn';$('#done-altersyn-page').hidden=page!=='done-altersyn';$('#todos-page').hidden=page!=='todos';$('#pig-news-page').hidden=page!=='pig-news';
+  $('#users-page').hidden=page!=='users';$('#departments-page').hidden=page!=='departments';$('#rooms-page').hidden=page!=='rooms';$('#pens-page').hidden=page!=='pens';$('#medicine-sow-page').hidden=page!=='medicine-sow';$('#medicine-sow-storage-page').hidden=page!=='medicine-sow-storage';$('#sow-injections-page').hidden=page!=='sow-injections';$('#done-sow-page').hidden=page!=='done-sow';$('#vet-questions-page').hidden=page!=='vet-questions';$('#file-storage-page').hidden=page!=='file-storage';$('#daily-remarks-page').hidden=page!=='daily-remarks';$('#repair-locations-page').hidden=page!=='repair-locations';$('#altersyn-page').hidden=page!=='altersyn';$('#done-altersyn-page').hidden=page!=='done-altersyn';$('#todos-page').hidden=page!=='todos';$('#pig-news-page').hidden=page!=='pig-news';$('#pig-game-page').hidden=page!=='pig-game';
   if(page==='pig-news'&&!pigNewsLoaded)loadPigNews();
   history.replaceState(null, '', `#${page}`);
 }
