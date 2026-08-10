@@ -14,6 +14,8 @@ let spawnIn = 110;
 let running = false;
 let lastTime = 0;
 let frame = 0;
+let jumpHeld = false;
+let jumpHoldTime = 0;
 
 bestNode.textContent = best;
 
@@ -25,6 +27,8 @@ function startGame() {
   spawnIn = 95;
   pig.y = groundY - pig.height;
   pig.velocity = 0;
+  jumpHeld = false;
+  jumpHoldTime = 0;
   running = true;
   lastTime = performance.now();
   overlay.hidden = true;
@@ -32,12 +36,19 @@ function startGame() {
   requestAnimationFrame(loop);
 }
 
-function jump() {
+function beginJump() {
   if (!running) return startGame();
   if (pig.y >= groundY - pig.height - 2) {
-    pig.velocity = -16.5;
+    pig.velocity = -12.5;
+    jumpHeld = true;
+    jumpHoldTime = 0;
     for (let i = 0; i < 6; i += 1) particles.push({ x: pig.x + 20, y: groundY - 5, vx: -Math.random() * 3, vy: -Math.random() * 2, life: 25 });
   }
+}
+
+function endJump() {
+  jumpHeld = false;
+  if (pig.velocity < -5.5) pig.velocity = -5.5;
 }
 
 function loop(now) {
@@ -60,15 +71,23 @@ function loop(now) {
 function update(delta) {
   frame += delta;
   pig.velocity += 0.88 * delta;
+  if (jumpHeld && pig.velocity < 0 && jumpHoldTime < 14) {
+    pig.velocity -= 0.48 * delta;
+    jumpHoldTime += delta;
+  }
   pig.y = Math.min(groundY - pig.height, pig.y + pig.velocity * delta);
   if (pig.y === groundY - pig.height) pig.velocity = 0;
   spawnIn -= delta;
   if (spawnIn <= 0) {
     const kinds = ['fence', 'puddle', 'crate'];
+    if (score > 45) kinds.push('hay');
+    if (score > 90) kinds.push('crow', 'crow');
     const kind = kinds[Math.floor(Math.random() * kinds.length)];
-    const sizes = { fence: [38, 72], puddle: [78, 22], crate: [49, 49] };
-    obstacles.push({ kind, x: canvas.width + 20, width: sizes[kind][0], height: sizes[kind][1] });
-    spawnIn = 78 + Math.random() * 62 - Math.min(25, score / 35);
+    const sizes = { fence: [38, 72], puddle: [78, 22], crate: [49, 49], hay: [55, 92], crow: [68, 34] };
+    const height = sizes[kind][1];
+    const y = kind === 'crow' ? groundY - 132 - Math.random() * 20 : groundY - height;
+    obstacles.push({ kind, x: canvas.width + 20, y, width: sizes[kind][0], height });
+    spawnIn = 78 + Math.random() * 62 - Math.min(38, score / 25);
   }
   for (const obstacle of obstacles) obstacle.x -= speed * delta;
   obstacles = obstacles.filter(obstacle => obstacle.x + obstacle.width > -10);
@@ -78,7 +97,7 @@ function update(delta) {
   speed = Math.min(13, 7 + score / 120);
   scoreNode.textContent = Math.floor(score);
   const hitbox = { x: pig.x + 12, y: pig.y + 8, width: pig.width - 20, height: pig.height - 10 };
-  if (obstacles.some(obstacle => intersects(hitbox, { x: obstacle.x + 3, y: groundY - obstacle.height + 3, width: obstacle.width - 6, height: obstacle.height - 3 }))) gameOver();
+  if (obstacles.some(obstacle => intersects(hitbox, { x: obstacle.x + 3, y: obstacle.y + 3, width: obstacle.width - 6, height: obstacle.height - 6 }))) gameOver();
 }
 
 function intersects(a, b) {
@@ -161,7 +180,16 @@ function drawPig() {
 }
 
 function drawObstacle(obstacle) {
-  const y = groundY - obstacle.height;
+  const y = obstacle.y;
+  if (obstacle.kind === 'crow') {
+    const flap = Math.sin(frame * .35) * 9;
+    ctx.fillStyle = '#303944';
+    ctx.beginPath(); ctx.ellipse(obstacle.x + 34, y + 18, 22, 13, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(obstacle.x + 25, y + 16); ctx.quadraticCurveTo(obstacle.x + 5, y - flap, obstacle.x, y + 8); ctx.quadraticCurveTo(obstacle.x + 15, y + 20, obstacle.x + 30, y + 21); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(obstacle.x + 43, y + 16); ctx.quadraticCurveTo(obstacle.x + 64, y - flap, obstacle.x + 68, y + 8); ctx.quadraticCurveTo(obstacle.x + 54, y + 20, obstacle.x + 39, y + 21); ctx.fill();
+    ctx.fillStyle = '#f1b43c'; ctx.beginPath(); ctx.moveTo(obstacle.x + 55, y + 15); ctx.lineTo(obstacle.x + 69, y + 20); ctx.lineTo(obstacle.x + 55, y + 23); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(obstacle.x + 50, y + 13, 3, 0, Math.PI * 2); ctx.fill(); return;
+  }
   if (obstacle.kind === 'puddle') {
     ctx.fillStyle = '#3d8fbc'; ctx.beginPath(); ctx.ellipse(obstacle.x + 39, groundY - 5, 40, 10, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#6dc8e4'; ctx.beginPath(); ctx.ellipse(obstacle.x + 33, groundY - 8, 22, 4, 0, 0, Math.PI * 2); ctx.fill(); return;
@@ -169,15 +197,28 @@ function drawObstacle(obstacle) {
   if (obstacle.kind === 'crate') {
     ctx.fillStyle = '#d48b3f'; ctx.fillRect(obstacle.x, y, obstacle.width, obstacle.height); ctx.strokeStyle = '#8d5428'; ctx.lineWidth = 5; ctx.strokeRect(obstacle.x, y, obstacle.width, obstacle.height); ctx.beginPath(); ctx.moveTo(obstacle.x, y); ctx.lineTo(obstacle.x + obstacle.width, groundY); ctx.moveTo(obstacle.x + obstacle.width, y); ctx.lineTo(obstacle.x, groundY); ctx.stroke(); return;
   }
+  if (obstacle.kind === 'hay') {
+    ctx.fillStyle = '#e8b83f'; ctx.beginPath(); ctx.roundRect(obstacle.x, y, obstacle.width, obstacle.height, 9); ctx.fill();
+    ctx.strokeStyle = '#ba7f27'; ctx.lineWidth = 4; ctx.strokeRect(obstacle.x + 5, y + 6, obstacle.width - 10, obstacle.height - 12);
+    ctx.strokeStyle = '#f7d76c'; ctx.lineWidth = 3; for (let offset = 14; offset < obstacle.height; offset += 17) { ctx.beginPath(); ctx.moveTo(obstacle.x + 6, y + offset); ctx.lineTo(obstacle.x + obstacle.width - 5, y + offset - 8); ctx.stroke(); } return;
+  }
   ctx.fillStyle = '#f0eee5'; ctx.fillRect(obstacle.x + 3, y, 10, obstacle.height); ctx.fillRect(obstacle.x + 27, y, 10, obstacle.height); ctx.fillStyle = '#d95d4b'; ctx.fillRect(obstacle.x, y + 15, 38, 12); ctx.fillRect(obstacle.x, y + 43, 38, 12);
 }
 
 document.querySelector('#game-start').addEventListener('click', startGame);
-document.querySelector('#game-jump').addEventListener('click', jump);
-canvas.addEventListener('pointerdown', jump);
+const jumpButton = document.querySelector('#game-jump');
+jumpButton.addEventListener('pointerdown', event => { event.preventDefault(); beginJump(); });
+jumpButton.addEventListener('pointerup', endJump);
+jumpButton.addEventListener('pointercancel', endJump);
+jumpButton.addEventListener('pointerleave', endJump);
+canvas.addEventListener('pointerdown', event => { event.preventDefault(); beginJump(); });
+canvas.addEventListener('pointerup', endJump);
+canvas.addEventListener('pointercancel', endJump);
+canvas.addEventListener('pointerleave', endJump);
 window.addEventListener('keydown', event => {
   if (document.querySelector('#pig-game-page').hidden || !['Space', 'ArrowUp'].includes(event.code)) return;
-  event.preventDefault(); jump();
+  event.preventDefault(); if (!event.repeat) beginJump();
 });
+window.addEventListener('keyup', event => { if (['Space', 'ArrowUp'].includes(event.code)) endJump(); });
 
 draw();
