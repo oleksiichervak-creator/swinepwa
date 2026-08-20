@@ -381,31 +381,23 @@ doneSowInjections.get('/week-report', requireAuth, async (req,res,next) => {
 
 doneSowInjections.get('/week-report.xlsx', requireAuth, async (req,res,next) => {
   try {
-    const report=await buildDoneSowWeekReport(req.query.start_date),workbook=new ExcelJS.Workbook(),sheet=workbook.addWorksheet('Week report');
-    sheet.columns=[{width:16},{width:16},{width:12},{width:24},{width:24},{width:22}];
-    sheet.pageSetup={paperSize:9,orientation:'portrait',fitToPage:false,scale:100,fitToWidth:1,fitToHeight:0,horizontalCentered:true,showGridLines:false,margins:{left:.3,right:.3,top:.5,bottom:.5,header:.2,footer:.2}};
-    sheet.mergeCells('A1:F1');sheet.getCell('A1').value='Dragte/Lobe/Polte week report';
-    sheet.mergeCells('A2:F2');sheet.getCell('A2').value=`Period: ${report.start_date} - ${report.end_date}`;
-    sheet.getCell('A1').font={name:'Calibri',size:16,bold:true};sheet.getCell('A1').alignment={horizontal:'center'};
-    sheet.getCell('A2').font={name:'Calibri',size:11,bold:true};sheet.getCell('A2').alignment={horizontal:'center'};
-    const headers=['First injection date','Sow number','Weight','Medicine','Diagnosis','Execution date/ml/by 1'];
-    sheet.addRow([]);sheet.addRow(headers);
+    const report=await buildDoneSowWeekReport(req.query.start_date),workbook=new ExcelJS.Workbook(),sheet=workbook.addWorksheet('Sows log import');
+    sheet.columns=[{header:'Date',width:13},{header:'Type (Sow/Piglet)',width:19},{header:'Sow ID / Group',width:15},{header:'Diagnosis',width:32},{header:'Quantity',width:10},{header:'Weight (kg)',width:12}];
     const thinBorder={top:{style:'thin'},left:{style:'thin'},bottom:{style:'thin'},right:{style:'thin'}};
     const headerFill={type:'pattern',pattern:'solid',fgColor:{argb:'FFEFEFEF'}};
-    sheet.getRow(4).eachCell(cell=>{cell.font={name:'Calibri',size:11,bold:true};cell.fill=headerFill;cell.border=thinBorder;cell.alignment={horizontal:'center',vertical:'middle',wrapText:true};});
+    sheet.getRow(1).height=30;sheet.getRow(1).eachCell(cell=>{cell.font={name:'Calibri',size:11,bold:true};cell.fill=headerFill;cell.border=thinBorder;cell.alignment={horizontal:'center',vertical:'middle',wrapText:true};});
     for(const course of report.courses){
       const first=course.injections[0],weight=first.weight_kg??inferredWeight(first.dose_ml,course.medicine_dose_ml,course.dose_kg);
-      const row=sheet.addRow([course.start_date,String(course.sow_number),weight,course.medicine_name,course.diagnosis,`${first.injection_date} - ${formatDose(first.dose_ml)} ml - ${first.given_by_username}\nInjection 1 of ${Math.max(1,Number(course.course_days)||1)}`]);
-      row.eachCell({includeEmpty:true},cell=>{cell.font={name:'Calibri',size:11};cell.border=thinBorder;cell.alignment={vertical:'top',wrapText:true};});
-      row.getCell(3).numFmt='0';
+      const numericSow=/^\d+$/.test(String(course.sow_number))?Number(course.sow_number):String(course.sow_number);
+      const row=sheet.addRow([new Date(`${course.start_date}T00:00:00Z`),'Sow',numericSow,course.diagnosis,1,weight==null?null:Math.round(Number(weight))]);
+      row.eachCell({includeEmpty:true},cell=>{cell.font={name:'Calibri',size:11};cell.border=thinBorder;cell.alignment={vertical:'center'};});
+      row.getCell(1).numFmt='dd\\-mm\\-yyyy';row.getCell(5).numFmt='0';row.getCell(6).numFmt='0.0';
     }
-    sheet.addRow([]);sheet.addRow([]);
-    const usageTitleRow=sheet.rowCount+1;sheet.mergeCells(`A${usageTitleRow}:B${usageTitleRow}`);sheet.getCell(`A${usageTitleRow}`).value='Medicine usage';
-    sheet.getCell(`A${usageTitleRow}`).font={name:'Calibri',size:16,bold:true};sheet.getCell(`A${usageTitleRow}`).alignment={horizontal:'center'};
-    const usageHeader=sheet.addRow(['Medicine','Total medicine ml']);
+    sheet.autoFilter={from:'A1',to:`F${Math.max(1,sheet.rowCount)}`};sheet.views=[{state:'frozen',ySplit:1,showGridLines:true}];
+    const usage=workbook.addWorksheet('Medicine usage');usage.columns=[{width:28},{width:20}];
+    const usageHeader=usage.addRow(['Medicine','Total medicine ml']);
     for(let column=1;column<=2;column++){const cell=usageHeader.getCell(column);cell.font={name:'Calibri',size:11,bold:true};cell.fill=headerFill;cell.border=thinBorder;cell.alignment={horizontal:'center'};}
-    for(const total of report.medicine_totals){const row=sheet.addRow([total.medicine_name,formatDose(total.total_dose_ml)]);for(let column=1;column<=2;column++){const cell=row.getCell(column);cell.font={name:'Calibri',size:11};cell.border=thinBorder;cell.alignment={vertical:'top',wrapText:true};}}
-    sheet.views=[{showGridLines:true}];
+    for(const total of report.medicine_totals){const row=usage.addRow([total.medicine_name,Number(total.total_dose_ml)]);row.getCell(2).numFmt='0.###';for(let column=1;column<=2;column++){const cell=row.getCell(column);cell.font={name:'Calibri',size:11};cell.border=thinBorder;cell.alignment={vertical:'top',wrapText:true};}}
     res.set({'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Content-Disposition':`attachment; filename="done-sow-${report.start_date}-${report.end_date}.xlsx"`});
     await workbook.xlsx.write(res);res.end();
   } catch(error){ if(error.status)return res.status(error.status).json({error:error.message});next(error); }
