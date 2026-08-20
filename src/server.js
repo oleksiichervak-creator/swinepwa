@@ -386,10 +386,12 @@ doneSowInjections.get('/week-report.xlsx', requireAuth, async (req,res,next) => 
     const thinBorder={top:{style:'thin'},left:{style:'thin'},bottom:{style:'thin'},right:{style:'thin'}};
     const headerFill={type:'pattern',pattern:'solid',fgColor:{argb:'FFEFEFEF'}};
     sheet.getRow(1).height=30;sheet.getRow(1).eachCell(cell=>{cell.font={name:'Calibri',size:11,bold:true};cell.fill=headerFill;cell.border=thinBorder;cell.alignment={horizontal:'center',vertical:'middle',wrapText:true};});
+    const unsupportedDiagnoses=[...new Set(report.courses.filter(course=>!sowLogDiagnosis(course.diagnosis)).map(course=>String(course.diagnosis||'(empty)')))];
+    if(unsupportedDiagnoses.length)throw Object.assign(new Error(`Unsupported Sows log diagnosis: ${unsupportedDiagnoses.join(', ')}`),{status:422});
     for(const course of report.courses){
       const first=course.injections[0],weight=first.weight_kg??inferredWeight(first.dose_ml,course.medicine_dose_ml,course.dose_kg);
       const numericSow=/^\d+$/.test(String(course.sow_number))?Number(course.sow_number):String(course.sow_number);
-      const row=sheet.addRow([new Date(`${course.start_date}T00:00:00Z`),'Sow',numericSow,course.diagnosis,1,weight==null?null:Math.round(Number(weight))]);
+      const row=sheet.addRow([new Date(`${course.start_date}T00:00:00Z`),'Sow',numericSow,sowLogDiagnosis(course.diagnosis),1,weight==null?null:Math.round(Number(weight))]);
       row.eachCell({includeEmpty:true},cell=>{cell.font={name:'Calibri',size:11};cell.border=thinBorder;cell.alignment={vertical:'center'};});
       row.getCell(1).numFmt='dd\\-mm\\-yyyy';row.getCell(5).numFmt='0';row.getCell(6).numFmt='0.0';
     }
@@ -908,6 +910,7 @@ function validStoredName(value){const name=String(value||'');if(!/^[a-f0-9-]{36}
 function xmlTag(xml,name){const match=xml.match(new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${name}>`,'i'));return match?decodeXml(match[1].replace(/^<!\[CDATA\[|\]\]>$/g,'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim()):'';}
 function decodeXml(value){return String(value).replace(/&#(\d+);/g,(_match,code)=>String.fromCodePoint(Number(code))).replace(/&#x([0-9a-f]+);/gi,(_match,code)=>String.fromCodePoint(Number.parseInt(code,16))).replace(/&(amp|lt|gt|quot|apos);/g,(_match,name)=>({amp:'&',lt:'<',gt:'>',quot:'"',apos:"'"})[name]);}
 function escapeRegExp(value){return String(value).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
+function sowLogDiagnosis(value){const raw=String(value||'').trim(),key=raw.toLocaleLowerCase().replace(/[–—]/g,'-').replace(/\s+/g,' ');const exact=new Map(['Heat issue','Farrow fever mild (FM)','Farrow fever severe (FS)','Skin infection (SKIN)','Intestinal worms','Arthritis mild (DB)','Arthritis severe (DBK)','Milk deficiency (OX)','Pain (M)','Diarrehea'].map(item=>[item.toLocaleLowerCase(),item]));if(exact.has(key))return exact.get(key);if(/severe.*(arthritis|bad leg)|(arthritis|bad leg).*severe|dbk/.test(key))return'Arthritis severe (DBK)';if(/arthritis|bad leg|\bdb\b/.test(key))return'Arthritis mild (DB)';if(/farrow.*fever.*severe|severe.*farrow.*fever|\bfs\b|40\+/.test(key))return'Farrow fever severe (FS)';if(/farrow.*fever|\bfm\b|39\s*-?\s*40/.test(key))return'Farrow fever mild (FM)';if(/milk|\box\b/.test(key))return'Milk deficiency (OX)';if(/skin|wound/.test(key))return'Skin infection (SKIN)';if(/diarr|diarrh/.test(key))return'Diarrehea';if(/worm/.test(key))return'Intestinal worms';if(/heat|missing heat/.test(key))return'Heat issue';if(/pain|unthrifty/.test(key))return'Pain (M)';return null;}
 
 function validateUser(body, passwordRequired) {
   const username = String(body.username || '').trim();
