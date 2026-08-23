@@ -289,6 +289,57 @@ export async function initializeDatabase() {
     )
   `);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS vaccines (
+      id BIGSERIAL PRIMARY KEY,
+      name VARCHAR(200) NOT NULL UNIQUE,
+      protects_against VARCHAR(500) NOT NULL,
+      dose_ml NUMERIC(12, 3) NOT NULL CHECK (dose_ml >= 0),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS vaccination_schedules (
+      id BIGSERIAL PRIMARY KEY,
+      vaccine_id BIGINT NOT NULL REFERENCES vaccines(id) ON DELETE RESTRICT,
+      week_after_insemination INTEGER NOT NULL CHECK (week_after_insemination >= 0),
+      recipient VARCHAR(10) NOT NULL CHECK (recipient IN ('all', 'polte')),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (vaccine_id, week_after_insemination, recipient)
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS planned_vaccines (
+      id BIGSERIAL PRIMARY KEY,
+      vaccine_id BIGINT NOT NULL REFERENCES vaccines(id) ON DELETE RESTRICT,
+      week_number INTEGER NOT NULL CHECK (week_number BETWEEN 1 AND 53),
+      group_number VARCHAR(150) NOT NULL,
+      recipient VARCHAR(10) NOT NULL CHECK (recipient IN ('all', 'polte')),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS done_vaccines (
+      id BIGSERIAL PRIMARY KEY,
+      vaccine_id BIGINT NOT NULL REFERENCES vaccines(id) ON DELETE RESTRICT,
+      week_number INTEGER NOT NULL CHECK (week_number BETWEEN 1 AND 53),
+      group_number VARCHAR(150) NOT NULL,
+      recipient VARCHAR(10) NOT NULL CHECK (recipient IN ('all', 'polte')),
+      pig_count INTEGER NOT NULL CHECK (pig_count >= 0),
+      vaccine_used_ml NUMERIC(12, 3) NOT NULL CHECK (vaccine_used_ml >= 0),
+      vaccination_date DATE NOT NULL,
+      given_by_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
   await pool.query(`ALTER TABLE planed_sow_injections ADD COLUMN IF NOT EXISTS source_system VARCHAR(50)`);
   await pool.query(`ALTER TABLE planed_sow_injections ADD COLUMN IF NOT EXISTS source_record_id BIGINT`);
   await pool.query(`ALTER TABLE planed_sow_injections ADD COLUMN IF NOT EXISTS weight_kg INTEGER CHECK (weight_kg > 0)`);
