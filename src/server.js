@@ -723,6 +723,7 @@ injectionPwa.post('/plans', requireAuth, async (req, res, next) => {
     const comment = req.body.comment == null || req.body.comment === '' ? null : String(req.body.comment).trim();
     const includeMelovem = req.body.include_melovem === true;
     const requestedMelovemDays = req.body.melovem_days == null ? null : Number(req.body.melovem_days);
+    const requestedMelovemDates = req.body.melovem_dates;
     if (!sowNumber || sowNumber.length > 100) throw Object.assign(new Error('A valid sow number is required'), { status: 400 });
     if (!Number.isInteger(penId) || penId < 1) throw Object.assign(new Error('A valid pen is required'), { status: 400 });
     if (!Number.isInteger(medicineSowId) || medicineSowId < 1) throw Object.assign(new Error('A valid medicine is required'), { status: 400 });
@@ -750,17 +751,28 @@ injectionPwa.post('/plans', requireAuth, async (req, res, next) => {
     if (requestedMelovemDays !== null && (!Number.isInteger(requestedMelovemDays) || requestedMelovemDays < 1 || requestedMelovemDays > 7)) {
       throw Object.assign(new Error('Melovem planning days must be from 1 to 7'), { status: 400 });
     }
+    let melovemDates;
+    if (requestedMelovemDates !== undefined) {
+      if (!Array.isArray(requestedMelovemDates) || requestedMelovemDates.length < 1 || requestedMelovemDates.length > 7) {
+        throw Object.assign(new Error('Select from 1 to 7 Melovem dates'), { status: 400 });
+      }
+      melovemDates = [...new Set(requestedMelovemDates.map(value => normalizeDate(value, 'Melovem date')))];
+      const lastMelovemDate = addUtcDays(injectionDate, 6);
+      if (melovemDates.length !== requestedMelovemDates.length || !melovemDates.includes(injectionDate) || melovemDates.some(date => date < injectionDate || date > lastMelovemDate)) {
+        throw Object.assign(new Error('Melovem dates must be unique and within 7 days of the start date'), { status: 400 });
+      }
+      melovemDates.sort();
+    }
     const created = [];
     for (const medicine of medicines) {
       if (!(medicine.dose_ml >= 0) || !(medicine.dose_kg > 0)) {
         throw Object.assign(new Error(`Dose settings are invalid for ${medicine.name}`), { status: 409 });
       }
       const doseMl = Number((weightKg * medicine.dose_ml / medicine.dose_kg).toFixed(3));
-      const courseDays = medicine.name.trim().toLocaleLowerCase() === 'melovem'
-        ? requestedMelovemDays ?? Math.max(1, Number(medicine.course_days) || 0)
-        : Math.max(1, Number(medicine.course_days) || 0);
-      for (let day = 0; day < courseDays; day += 1) {
-        const plannedDate = addUtcDays(injectionDate, day);
+      const isMelovem = medicine.name.trim().toLocaleLowerCase() === 'melovem';
+      const courseDays = isMelovem ? requestedMelovemDays ?? Math.max(1, Number(medicine.course_days) || 0) : Math.max(1, Number(medicine.course_days) || 0);
+      const plannedDates = isMelovem && melovemDates ? melovemDates : Array.from({ length: courseDays }, (_, day) => addUtcDays(injectionDate, day));
+      for (const plannedDate of plannedDates) {
         const inserted = await client.query(`INSERT INTO planed_sow_injections
           (sow_number,pen_id,injection_date,medicine_sow_id,dose_ml,weight_kg,comment)
           VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id`,

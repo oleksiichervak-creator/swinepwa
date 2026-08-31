@@ -147,6 +147,10 @@ async function preparePlanForm() {
   form.medicine_sow_id.innerHTML = '<option value="">Select medicine</option>' +
     medicines.map(m => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
   form.weight_kg.value = '';
+  $('#melovem-schedule').hidden = true;
+  $('#melovem-calendar').hidden = true;
+  $('#melovem-calendar').dataset.baseDate = '';
+  $('#add-melovem-days').setAttribute('aria-expanded', 'false');
   $('#weight-grid').innerHTML = Array.from({ length: 14 }, (_, index) => 75 + index * 25)
     .map(weight => `<button class="weight-button" type="button" data-weight="${weight}">${weight}<small>kg</small></button>`).join('');
   document.querySelectorAll('[data-weight]').forEach(button => button.addEventListener('click', () => selectWeight(button)));
@@ -252,12 +256,7 @@ async function validatePenInput() {
 $('#plan-form').medicine_sow_id.addEventListener('change', event => {
   document.querySelector('.step[data-step="5"]').hidden = true;
   if (event.target.value) {
-    const medicine = references.medicines.find(item => String(item.id) === event.target.value);
-    const melovem = references.medicines.find(item => item.name.trim().toLocaleLowerCase() === 'melovem');
-    if (medicine?.name.trim().toLocaleLowerCase() === 'melovem' || melovem) {
-      const defaultDays = medicine?.name.trim().toLocaleLowerCase() === 'melovem' ? medicine.course_days : melovem.course_days;
-      $('#plan-form').melovem_days.value = String(Math.min(7, Math.max(1, Number(defaultDays) || 1)));
-    }
+    $('#melovem-calendar').dataset.baseDate = '';
     revealStep(4);
   }
 });
@@ -270,7 +269,16 @@ function selectWeight(button) {
 }
 
 $('#plan-form').include_melovem.addEventListener('change', updateDosePreview);
-$('#plan-form').melovem_days.addEventListener('change', updateDosePreview);
+$('#plan-form').injection_date.addEventListener('change', () => {
+  $('#melovem-calendar').dataset.baseDate = '';
+  updateDosePreview();
+});
+$('#add-melovem-days').addEventListener('click', () => {
+  const calendar = $('#melovem-calendar');
+  calendar.hidden = !calendar.hidden;
+  $('#add-melovem-days').setAttribute('aria-expanded', String(!calendar.hidden));
+});
+$('#melovem-calendar').addEventListener('change', updateDosePreview);
 
 function updateDosePreview() {
   const form = $('#plan-form');
@@ -284,11 +292,31 @@ function updateDosePreview() {
   $('#melovem-option').hidden = !offerMelovem;
   const includeMelovem = offerMelovem && form.include_melovem.checked && melovem;
   const planMelovem = selectedMelovem || includeMelovem;
-  $('#melovem-days-option').hidden = !planMelovem;
-  const melovemDays = Number(form.melovem_days.value);
+  $('#melovem-schedule').hidden = !planMelovem;
+  if (planMelovem) renderMelovemCalendar();
+  const melovemDays = planMelovem ? selectedMelovemDates().length : 1;
   $('#dose-preview').innerHTML = `
     <div><span>${escapeHtml(medicine.name)} · ${selectedMelovem ? daysLabel(melovemDays) : courseLabel(medicine)}</span><strong>${formatDose(dose)} ml/day</strong></div>
     ${includeMelovem ? `<div><span>Melovem · ${daysLabel(melovemDays)}</span><strong>${formatDose(calculateDose(melovem, weight))} ml/day</strong></div>` : ''}`;
+}
+
+function renderMelovemCalendar() {
+  const baseDate = $('#plan-form').injection_date.value;
+  const calendar = $('#melovem-calendar');
+  if (!baseDate || calendar.dataset.baseDate === baseDate) return;
+  calendar.dataset.baseDate = baseDate;
+  calendar.innerHTML = Array.from({ length: 7 }, (_, offset) => {
+    const date = new Date(`${baseDate}T00:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + offset);
+    const value = date.toISOString().slice(0, 10);
+    const weekday = new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: 'UTC' }).format(date);
+    return `<label class="melovem-day"><input type="checkbox" value="${value}" ${offset === 0 ? 'checked disabled' : ''}><span>${weekday}</span><small>${value.slice(5)}</small></label>`;
+  }).join('');
+}
+
+function selectedMelovemDates() {
+  const baseDate = $('#plan-form').injection_date.value;
+  return [baseDate, ...[...document.querySelectorAll('#melovem-calendar input:checked:not(:disabled)')].map(input => input.value)];
 }
 
 $('#pin-keypad').addEventListener('click', event => {
@@ -327,7 +355,7 @@ $('#plan-form').addEventListener('submit', async event => {
   data.medicine_sow_id = Number(data.medicine_sow_id);
   data.weight_kg = Number(data.weight_kg);
   data.include_melovem = data.include_melovem === 'on';
-  data.melovem_days = Number(data.melovem_days);
+  data.melovem_dates = selectedMelovemDates();
   data.comment = data.comment.trim() || null;
   try {
     const result = await api('/api/injection-pwa/plans', { method: 'POST', body: JSON.stringify(data) });
