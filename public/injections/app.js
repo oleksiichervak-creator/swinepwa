@@ -251,7 +251,15 @@ async function validatePenInput() {
 
 $('#plan-form').medicine_sow_id.addEventListener('change', event => {
   document.querySelector('.step[data-step="5"]').hidden = true;
-  if (event.target.value) revealStep(4);
+  if (event.target.value) {
+    const medicine = references.medicines.find(item => String(item.id) === event.target.value);
+    const melovem = references.medicines.find(item => item.name.trim().toLocaleLowerCase() === 'melovem');
+    if (medicine?.name.trim().toLocaleLowerCase() === 'melovem' || melovem) {
+      const defaultDays = medicine?.name.trim().toLocaleLowerCase() === 'melovem' ? medicine.course_days : melovem.course_days;
+      $('#plan-form').melovem_days.value = String(Math.min(7, Math.max(1, Number(defaultDays) || 1)));
+    }
+    revealStep(4);
+  }
 });
 
 function selectWeight(button) {
@@ -262,20 +270,25 @@ function selectWeight(button) {
 }
 
 $('#plan-form').include_melovem.addEventListener('change', updateDosePreview);
+$('#plan-form').melovem_days.addEventListener('change', updateDosePreview);
 
 function updateDosePreview() {
   const form = $('#plan-form');
   const medicine = references.medicines.find(item => String(item.id) === form.medicine_sow_id.value);
-  const melovem = references.medicines.find(item => item.name.toLocaleLowerCase() === 'melovem');
+  const melovem = references.medicines.find(item => item.name.trim().toLocaleLowerCase() === 'melovem');
   const weight = Number(form.weight_kg.value);
   if (!medicine || !weight) return;
   const dose = calculateDose(medicine, weight);
-  const offerMelovem = medicine.name.toLocaleLowerCase() !== 'melovem';
+  const selectedMelovem = medicine.name.trim().toLocaleLowerCase() === 'melovem';
+  const offerMelovem = !selectedMelovem;
   $('#melovem-option').hidden = !offerMelovem;
   const includeMelovem = offerMelovem && form.include_melovem.checked && melovem;
+  const planMelovem = selectedMelovem || includeMelovem;
+  $('#melovem-days-option').hidden = !planMelovem;
+  const melovemDays = Number(form.melovem_days.value);
   $('#dose-preview').innerHTML = `
-    <div><span>${escapeHtml(medicine.name)} · ${courseLabel(medicine)}</span><strong>${formatDose(dose)} ml/day</strong></div>
-    ${includeMelovem ? `<div><span>Melovem · ${courseLabel(melovem)}</span><strong>${formatDose(calculateDose(melovem, weight))} ml/day</strong></div>` : ''}`;
+    <div><span>${escapeHtml(medicine.name)} · ${selectedMelovem ? daysLabel(melovemDays) : courseLabel(medicine)}</span><strong>${formatDose(dose)} ml/day</strong></div>
+    ${includeMelovem ? `<div><span>Melovem · ${daysLabel(melovemDays)}</span><strong>${formatDose(calculateDose(melovem, weight))} ml/day</strong></div>` : ''}`;
 }
 
 $('#pin-keypad').addEventListener('click', event => {
@@ -290,8 +303,10 @@ $('#pin-keypad').addEventListener('click', event => {
 
 function courseLabel(medicine) {
   const days = Math.max(1, Number(medicine.course_days) || 0);
-  return `${days} day${days === 1 ? '' : 's'}`;
+  return daysLabel(days);
 }
+
+function daysLabel(days) { return `${days} day${days === 1 ? '' : 's'}`; }
 
 function calculateDose(medicine, weight) {
   const doseKg = Number(medicine.dose_kg);
@@ -312,6 +327,7 @@ $('#plan-form').addEventListener('submit', async event => {
   data.medicine_sow_id = Number(data.medicine_sow_id);
   data.weight_kg = Number(data.weight_kg);
   data.include_melovem = data.include_melovem === 'on';
+  data.melovem_days = Number(data.melovem_days);
   data.comment = data.comment.trim() || null;
   try {
     const result = await api('/api/injection-pwa/plans', { method: 'POST', body: JSON.stringify(data) });

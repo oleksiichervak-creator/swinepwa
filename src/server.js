@@ -722,6 +722,7 @@ injectionPwa.post('/plans', requireAuth, async (req, res, next) => {
     const weightKg = Number(req.body.weight_kg);
     const comment = req.body.comment == null || req.body.comment === '' ? null : String(req.body.comment).trim();
     const includeMelovem = req.body.include_melovem === true;
+    const requestedMelovemDays = req.body.melovem_days == null ? null : Number(req.body.melovem_days);
     if (!sowNumber || sowNumber.length > 100) throw Object.assign(new Error('A valid sow number is required'), { status: 400 });
     if (!Number.isInteger(penId) || penId < 1) throw Object.assign(new Error('A valid pen is required'), { status: 400 });
     if (!Number.isInteger(medicineSowId) || medicineSowId < 1) throw Object.assign(new Error('A valid medicine is required'), { status: 400 });
@@ -746,13 +747,18 @@ injectionPwa.post('/plans', requireAuth, async (req, res, next) => {
       if (!melovem) throw Object.assign(new Error('Melovem is not available in the medicine list'), { status: 409 });
       medicines.push(melovem);
     }
+    if (requestedMelovemDays !== null && (!Number.isInteger(requestedMelovemDays) || requestedMelovemDays < 1 || requestedMelovemDays > 7)) {
+      throw Object.assign(new Error('Melovem planning days must be from 1 to 7'), { status: 400 });
+    }
     const created = [];
     for (const medicine of medicines) {
       if (!(medicine.dose_ml >= 0) || !(medicine.dose_kg > 0)) {
         throw Object.assign(new Error(`Dose settings are invalid for ${medicine.name}`), { status: 409 });
       }
       const doseMl = Number((weightKg * medicine.dose_ml / medicine.dose_kg).toFixed(3));
-      const courseDays = Math.max(1, Number(medicine.course_days) || 0);
+      const courseDays = medicine.name.trim().toLocaleLowerCase() === 'melovem'
+        ? requestedMelovemDays ?? Math.max(1, Number(medicine.course_days) || 0)
+        : Math.max(1, Number(medicine.course_days) || 0);
       for (let day = 0; day < courseDays; day += 1) {
         const plannedDate = addUtcDays(injectionDate, day);
         const inserted = await client.query(`INSERT INTO planed_sow_injections
