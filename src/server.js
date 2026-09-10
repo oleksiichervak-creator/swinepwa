@@ -657,13 +657,13 @@ injectionPwa.get('/history', requireAuth, async (req, res, next) => {
     if (!sowNumber || sowNumber.length > 100) return res.status(400).json({ error: 'A valid sow number is required' });
     const history = await pool.query(`
       SELECT 'planned' AS status,i.id,i.sow_number,i.injection_date,i.dose_ml::float8 AS dose_ml,
-        i.comment,p.name AS pen_name,m.name AS medicine_name
+        i.comment,p.name AS pen_name,i.medicine_sow_id,m.name AS medicine_name,m.diagnosis
       FROM planed_sow_injections i
       JOIN pens p ON p.id=i.pen_id JOIN medicine_sow m ON m.id=i.medicine_sow_id
       WHERE lower(i.sow_number)=lower($1)
       UNION ALL
       SELECT 'done' AS status,i.id,i.sow_number,i.injection_date,i.dose_ml::float8 AS dose_ml,
-        i.comment,p.name AS pen_name,m.name AS medicine_name
+        i.comment,p.name AS pen_name,i.medicine_sow_id,m.name AS medicine_name,m.diagnosis
       FROM done_sow_injections i
       JOIN pens p ON p.id=i.pen_id JOIN medicine_sow m ON m.id=i.medicine_sow_id
       WHERE lower(i.sow_number)=lower($1)

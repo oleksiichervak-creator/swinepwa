@@ -9,6 +9,7 @@ let currentUser = null;
 let todayItems = [];
 let altersynTodayItems = [];
 let references = null;
+let sowHistoryItems = [];
 let installPrompt = null;
 
 async function api(path, options = {}) {
@@ -161,6 +162,8 @@ async function preparePlanForm() {
   $('#sow-check-status').textContent = '';
   $('#sow-history').hidden = true;
   $('#sow-history').innerHTML = '';
+  sowHistoryItems = [];
+  $('#recent-medicine-warning').hidden = true;
   for (const step of document.querySelectorAll('.step')) step.hidden = step.dataset.step !== '1';
 }
 
@@ -182,6 +185,8 @@ $('#plan-form').sow_number.addEventListener('input', () => {
   clearTimeout(sowCheckTimer);
   hideStepsFrom(2);
   $('#sow-history').hidden = true;
+  sowHistoryItems = [];
+  $('#recent-medicine-warning').hidden = true;
   $('#sow-check-status').textContent = '';
   const sowNumber = $('#plan-form').sow_number.value.trim();
   if (!sowNumber) return;
@@ -197,6 +202,7 @@ async function checkSowHistory(sowNumber) {
     const items = await api(`/api/injection-pwa/history?sow_number=${encodeURIComponent(sowNumber)}`);
     if (sequence !== sowCheckSequence || $('#plan-form').sow_number.value.trim() !== sowNumber) return;
     $('#sow-check-status').textContent = 'History checked';
+    sowHistoryItems = items;
     history.hidden = false;
     history.innerHTML = items.length
       ? `<strong>${items.length} existing record${items.length === 1 ? '' : 's'}</strong>` + items.map(item => `
@@ -255,6 +261,7 @@ async function validatePenInput() {
 
 $('#plan-form').medicine_sow_id.addEventListener('change', event => {
   document.querySelector('.step[data-step="5"]').hidden = true;
+  updateRecentMedicineWarning();
   if (event.target.value) {
     $('#melovem-calendar').dataset.baseDate = '';
     revealStep(4);
@@ -271,6 +278,7 @@ function selectWeight(button) {
 $('#plan-form').include_melovem.addEventListener('change', updateDosePreview);
 $('#plan-form').injection_date.addEventListener('change', () => {
   $('#melovem-calendar').dataset.baseDate = '';
+  updateRecentMedicineWarning();
   updateDosePreview();
 });
 $('#add-melovem-days').addEventListener('click', () => {
@@ -317,6 +325,26 @@ function renderMelovemCalendar() {
 function selectedMelovemDates() {
   const baseDate = $('#plan-form').injection_date.value;
   return [baseDate, ...[...document.querySelectorAll('#melovem-calendar input:checked:not(:disabled)')].map(input => input.value)];
+}
+
+function updateRecentMedicineWarning() {
+  const form = $('#plan-form');
+  const warning = $('#recent-medicine-warning');
+  const medicine = references?.medicines.find(item => String(item.id) === form.medicine_sow_id.value);
+  const plannedDate = form.injection_date.value;
+  warning.hidden = true;
+  if (!medicine || !plannedDate) return;
+  const plannedTime = Date.parse(`${plannedDate}T00:00:00Z`);
+  const diagnosis = String(medicine.diagnosis || '').trim().toLocaleLowerCase();
+  const recent = sowHistoryItems.filter(item => {
+    if (item.status !== 'done' || String(item.medicine_sow_id) !== String(medicine.id)) return false;
+    if (String(item.diagnosis || '').trim().toLocaleLowerCase() !== diagnosis) return false;
+    const daysAgo = (plannedTime - Date.parse(`${item.injection_date}T00:00:00Z`)) / 86400000;
+    return daysAgo >= 0 && daysAgo <= 14;
+  }).sort((a, b) => b.injection_date.localeCompare(a.injection_date));
+  if (!recent.length) return;
+  warning.innerHTML = `<strong>Warning: maybe this antibiotic did not help</strong>This sow received ${escapeHtml(medicine.name)} for ${escapeHtml(medicine.diagnosis)} on ${escapeHtml(recent[0].injection_date)}.`;
+  warning.hidden = false;
 }
 
 $('#pin-keypad').addEventListener('click', event => {
