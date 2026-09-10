@@ -335,9 +335,10 @@ function updateRecentMedicineWarning() {
   warning.hidden = true;
   if (!medicine || !plannedDate) return;
   const plannedTime = Date.parse(`${plannedDate}T00:00:00Z`);
+  const medicineName = String(medicine.name || '').trim().toLocaleLowerCase();
   const diagnosis = String(medicine.diagnosis || '').trim().toLocaleLowerCase();
   const recent = sowHistoryItems.filter(item => {
-    if (item.status !== 'done' || String(item.medicine_sow_id) !== String(medicine.id)) return false;
+    if (item.status !== 'done' || String(item.medicine_name || '').trim().toLocaleLowerCase() !== medicineName) return false;
     if (String(item.diagnosis || '').trim().toLocaleLowerCase() !== diagnosis) return false;
     const daysAgo = (plannedTime - Date.parse(`${item.injection_date}T00:00:00Z`)) / 86400000;
     return daysAgo >= 0 && daysAgo <= 14;
