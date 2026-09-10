@@ -631,5 +631,9 @@ function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 }
 
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('/injections/sw.js', { scope: '/injections/' });
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/injections/sw.js', { scope: '/injections/', updateViaCache: 'none' })
+    .then(registration => registration.update())
+    .catch(() => {});
+}
 restoreSession();
