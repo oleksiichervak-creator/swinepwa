@@ -1,9 +1,9 @@
-const CACHE = 'sow-injections-v15';
+const CACHE = 'sow-injections-v16';
 const SHELL = [
   '/injections/',
   '/injections/index.html',
-  '/injections/styles.css?v=15',
-  '/injections/app.js?v=15',
+  '/injections/styles.css?v=16',
+  '/injections/app.js?v=16',
   '/injections/manifest.json',
   '/injections/icon.svg',
 ];

@@ -672,6 +672,31 @@ injectionPwa.get('/history', requireAuth, async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
+injectionPwa.get('/recent-treatment-warning', requireAuth, async (req, res, next) => {
+  try {
+    const sowNumber = String(req.query.sow_number || '').trim();
+    const medicineSowId = Number(req.query.medicine_sow_id);
+    const plannedDate = normalizeDate(req.query.planned_date, 'Planned date');
+    if (!sowNumber || sowNumber.length > 100) return res.status(400).json({ error: 'A valid sow number is required' });
+    if (!Number.isInteger(medicineSowId) || medicineSowId < 1) return res.status(400).json({ error: 'A valid medicine is required' });
+    const result = await pool.query(`
+      SELECT i.injection_date,m.name AS medicine_name,m.diagnosis
+      FROM done_sow_injections i
+      JOIN medicine_sow m ON m.id=i.medicine_sow_id
+      JOIN medicine_sow selected ON selected.id=$2
+      WHERE lower(i.sow_number)=lower($1)
+        AND lower(trim(m.name))=lower(trim(selected.name))
+        AND lower(trim(m.diagnosis))=lower(trim(selected.diagnosis))
+        AND i.injection_date BETWEEN $3::date - 14 AND $3::date
+      ORDER BY i.injection_date DESC,i.id DESC
+      LIMIT 1`, [sowNumber, medicineSowId, plannedDate]);
+    res.json({ warning: result.rows[0] || null });
+  } catch (error) {
+    if (error.status) return res.status(error.status).json({ error: error.message });
+    next(error);
+  }
+});
+
 injectionPwa.get('/today', requireAuth, async (req, res, next) => {
   try {
     const date = normalizeDate(req.query.date || new Date(), 'date');

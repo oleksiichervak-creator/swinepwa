@@ -327,25 +327,24 @@ function selectedMelovemDates() {
   return [baseDate, ...[...document.querySelectorAll('#melovem-calendar input:checked:not(:disabled)')].map(input => input.value)];
 }
 
-function updateRecentMedicineWarning() {
+let warningRequestSequence = 0;
+async function updateRecentMedicineWarning() {
   const form = $('#plan-form');
   const warning = $('#recent-medicine-warning');
   const medicine = references?.medicines.find(item => String(item.id) === form.medicine_sow_id.value);
+  const sowNumber = form.sow_number.value.trim();
   const plannedDate = form.injection_date.value;
+  const sequence = ++warningRequestSequence;
   warning.hidden = true;
-  if (!medicine || !plannedDate) return;
-  const plannedTime = Date.parse(`${plannedDate}T00:00:00Z`);
-  const medicineName = String(medicine.name || '').trim().toLocaleLowerCase();
-  const diagnosis = String(medicine.diagnosis || '').trim().toLocaleLowerCase();
-  const recent = sowHistoryItems.filter(item => {
-    if (item.status !== 'done' || String(item.medicine_name || '').trim().toLocaleLowerCase() !== medicineName) return false;
-    if (String(item.diagnosis || '').trim().toLocaleLowerCase() !== diagnosis) return false;
-    const daysAgo = (plannedTime - Date.parse(`${item.injection_date}T00:00:00Z`)) / 86400000;
-    return daysAgo >= 0 && daysAgo <= 14;
-  }).sort((a, b) => b.injection_date.localeCompare(a.injection_date));
-  if (!recent.length) return;
-  warning.innerHTML = `<strong>Warning: maybe this antibiotic did not help</strong>This sow received ${escapeHtml(medicine.name)} for ${escapeHtml(medicine.diagnosis)} on ${escapeHtml(recent[0].injection_date)}.`;
-  warning.hidden = false;
+  if (!medicine || !sowNumber || !plannedDate) return;
+  try {
+    const result = await api(`/api/injection-pwa/recent-treatment-warning?sow_number=${encodeURIComponent(sowNumber)}&medicine_sow_id=${medicine.id}&planned_date=${plannedDate}`);
+    if (sequence !== warningRequestSequence || !result.warning) return;
+    warning.innerHTML = `<strong>Warning: maybe this antibiotic did not help</strong>This sow received ${escapeHtml(result.warning.medicine_name)} for ${escapeHtml(result.warning.diagnosis)} on ${escapeHtml(result.warning.injection_date)}.`;
+    warning.hidden = false;
+  } catch (error) {
+    if (sequence === warningRequestSequence) $('#plan-error').textContent = error.message;
+  }
 }
 
 $('#pin-keypad').addEventListener('click', event => {
