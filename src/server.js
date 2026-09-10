@@ -540,9 +540,32 @@ const vaccines=createTableCrud({table:'vaccines',alias:'v',label:'Vaccine',field
 const vaccinationSchedules=createTableCrud({table:'vaccination_schedules',alias:'s',label:'Vaccination schedule',fields:['vaccine_id','week_after_insemination','recipient'],validate:validateVaccinationSchedule,
   select:'SELECT s.id,s.vaccine_id,v.name AS vaccine_name,s.week_after_insemination,s.recipient,s.created_at,s.updated_at FROM vaccination_schedules s JOIN vaccines v ON v.id=s.vaccine_id',order:'s.week_after_insemination,lower(v.name),s.id'});
 const plannedVaccines=createTableCrud({table:'planned_vaccines',alias:'p',label:'Planned vaccine',fields:['vaccine_id','week_number','group_number','recipient'],validate:validatePlannedVaccine,
-  select:'SELECT p.id,p.vaccine_id,v.name AS vaccine_name,p.week_number,p.group_number,p.recipient,p.created_at,p.updated_at FROM planned_vaccines p JOIN vaccines v ON v.id=p.vaccine_id',order:'p.week_number,p.group_number,lower(v.name),p.id'});
+  select:'SELECT p.id,p.vaccine_id,v.name AS vaccine_name,p.week_number,p.group_number,p.recipient,p.insemination_year,p.pig_count,p.vaccination_date,p.created_at,p.updated_at FROM planned_vaccines p JOIN vaccines v ON v.id=p.vaccine_id',order:'COALESCE(p.vaccination_date,make_date(2000,1,1)),p.week_number,p.group_number,lower(v.name),p.id'});
 const doneVaccines=createTableCrud({table:'done_vaccines',alias:'d',label:'Done vaccine',fields:['vaccine_id','week_number','group_number','recipient','pig_count','vaccine_used_ml','vaccination_date','given_by_user_id'],validate:validateDoneVaccine,
   select:'SELECT d.id,d.vaccine_id,v.name AS vaccine_name,d.week_number,d.group_number,d.recipient,d.pig_count,d.vaccine_used_ml::float8 AS vaccine_used_ml,d.vaccination_date,d.given_by_user_id,u.username AS given_by_username,d.created_at,d.updated_at FROM done_vaccines d JOIN vaccines v ON v.id=d.vaccine_id JOIN users u ON u.id=d.given_by_user_id',order:'d.vaccination_date DESC,d.id DESC'});
+plannedVaccines.post('/make-plan',requireAuth,requireAdmin,async(req,res,next)=>{
+  const client=await pool.connect();
+  try{
+    const groupWeek=wholeNumber(req.body.group_number,'Group number',1,53),totalCount=wholeNumber(req.body.total_count,'Total count',0),polteCount=wholeNumber(req.body.polte_count,'Polte count',0,totalCount),year=wholeNumber(req.body.insemination_year,'Insemination year',2000,2100);
+    if(polteCount>totalCount)throw Object.assign(new Error('Polte count cannot exceed total count'),{status:400});
+    const inseminationMonday=isoWeekMonday(year,groupWeek);
+    await client.query('BEGIN');
+    const schedules=(await client.query('SELECT vaccine_id,week_after_insemination,recipient FROM vaccination_schedules ORDER BY week_after_insemination,id')).rows;
+    if(!schedules.length)throw Object.assign(new Error('Create a vaccination schedule before making a plan'),{status:409});
+    const duplicate=await client.query('SELECT id FROM planned_vaccines WHERE group_number=$1 AND insemination_year=$2 LIMIT 1',[String(groupWeek),year]);
+    if(duplicate.rows[0])throw Object.assign(new Error(`A plan already exists for group ${groupWeek} in ${year}`),{status:409});
+    const created=[];
+    for(const schedule of schedules){
+      const vaccinationDate=addUtcDays(inseminationMonday,Number(schedule.week_after_insemination)*7+2),pigCount=schedule.recipient==='polte'?polteCount:totalCount;
+      if(schedule.recipient==='polte'&&pigCount===0)continue;
+      const inserted=await client.query(`INSERT INTO planned_vaccines(vaccine_id,week_number,group_number,recipient,insemination_year,pig_count,vaccination_date)
+        VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id`,[schedule.vaccine_id,isoWeekNumber(vaccinationDate),String(groupWeek),schedule.recipient,year,pigCount,vaccinationDate]);
+      created.push(inserted.rows[0].id);
+    }
+    await client.query('COMMIT');
+    res.status(201).json({group_number:String(groupWeek),insemination_year:year,total_count:totalCount,polte_count:polteCount,plans_created:created.length});
+  }catch(error){await client.query('ROLLBACK').catch(()=>{});handleDbError(error,res,next);}finally{client.release();}
+});
 app.use('/api/vaccines',vaccines);app.use('/vaccines',vaccines);
 app.use('/api/vaccination-schedules',vaccinationSchedules);app.use('/vaccination-schedules',vaccinationSchedules);
 app.use('/api/planned-vaccines',plannedVaccines);app.use('/planned-vaccines',plannedVaccines);
@@ -963,6 +986,7 @@ async function buildDoneSowWeekReport(start){
   };
 }
 function isoWeekNumber(value){const date=new Date(`${value}T00:00:00Z`),day=date.getUTCDay()||7;date.setUTCDate(date.getUTCDate()+4-day);const yearStart=new Date(Date.UTC(date.getUTCFullYear(),0,1));return Math.ceil((((date-yearStart)/86400000)+1)/7);}
+function isoWeekMonday(year,week){const jan4=new Date(Date.UTC(year,0,4)),day=jan4.getUTCDay()||7,monday=new Date(jan4);monday.setUTCDate(jan4.getUTCDate()-(day-1)+(week-1)*7);const thursday=new Date(monday);thursday.setUTCDate(monday.getUTCDate()+3);if(thursday.getUTCFullYear()!==year)throw Object.assign(new Error(`Week ${week} does not exist in ${year}`),{status:400});return monday.toISOString().slice(0,10);}
 function userInitials(value){const parts=String(value||'').trim().split(/[^\p{L}\p{N}]+/u).filter(Boolean);return parts.map(part=>part[0]).join('').toLocaleUpperCase().slice(0,3);}
 function formatDose(value){return Number(value).toLocaleString('en-GB',{maximumFractionDigits:3});}
 function inferredWeight(actualDose,medicineDose,medicineWeight){const dose=Number(medicineDose),weight=dose>0?Number(actualDose)*Number(medicineWeight)/dose:0;return Math.round(weight);}

@@ -340,6 +340,11 @@ export async function initializeDatabase() {
     )
   `);
 
+  await pool.query(`ALTER TABLE planned_vaccines ADD COLUMN IF NOT EXISTS insemination_year INTEGER`);
+  await pool.query(`ALTER TABLE planned_vaccines ADD COLUMN IF NOT EXISTS pig_count INTEGER CHECK (pig_count >= 0)`);
+  await pool.query(`ALTER TABLE planned_vaccines ADD COLUMN IF NOT EXISTS vaccination_date DATE`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS planned_vaccines_group_year_idx ON planned_vaccines(group_number, insemination_year)`);
+
   await pool.query(`ALTER TABLE planed_sow_injections ADD COLUMN IF NOT EXISTS source_system VARCHAR(50)`);
   await pool.query(`ALTER TABLE planed_sow_injections ADD COLUMN IF NOT EXISTS source_record_id BIGINT`);
   await pool.query(`ALTER TABLE planed_sow_injections ADD COLUMN IF NOT EXISTS weight_kg INTEGER CHECK (weight_kg > 0)`);
