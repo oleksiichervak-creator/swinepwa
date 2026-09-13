@@ -289,6 +289,20 @@ export async function initializeDatabase() {
     )
   `);
 
+  await pool.query(`ALTER TABLE donealtersyn ADD COLUMN IF NOT EXISTS altersyn_id BIGINT`);
+  await pool.query(`ALTER TABLE donealtersyn ADD COLUMN IF NOT EXISTS ventil VARCHAR(150)`);
+  await pool.query(`
+    DO $$ BEGIN
+      ALTER TABLE donealtersyn ADD CONSTRAINT donealtersyn_altersyn_fk
+        FOREIGN KEY (altersyn_id) REFERENCES altersyn(id) ON DELETE SET NULL;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END $$
+  `);
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS donealtersyn_source_date_unique
+      ON donealtersyn(altersyn_id,done_date) WHERE altersyn_id IS NOT NULL
+  `);
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS vaccines (
       id BIGSERIAL PRIMARY KEY,

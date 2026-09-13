@@ -458,7 +458,7 @@ async function loadAltersynToday() {
         <header><h2>Group ${escapeHtml(item.group)}</h2><span class="status ${item.completed ? 'done' : 'planned'}">${item.completed ? 'Done' : 'Today'}</span></header>
         <div class="altersyn-details"><div><span>Ventil</span><strong>${escapeHtml(item.ventil)}</strong></div><div><span>Amount</span><strong>${item.amount}</strong></div></div>
         ${item.completed ? '<p class="completed-note">Altresyn has already been registered today.</p>' : `
-          <div class="extra-dose-row"><span>Extra doses</span><div class="stepper"><button type="button" data-extra-minus aria-label="Decrease extra doses">−</button><output>2</output><button type="button" data-extra-plus aria-label="Increase extra doses">+</button></div></div>
+          <div class="extra-dose-row"><span>Extra doses</span><div class="stepper"><button type="button" data-extra-minus aria-label="Decrease extra doses">−</button><output>0</output><button type="button" data-extra-plus aria-label="Increase extra doses">+</button></div></div>
           <button class="complete-button" type="button" data-altersyn-done>Done</button>`}
       </article>`).join('') : '<div class="empty">No Altresyn treatment scheduled for today.</div>';
     list.querySelectorAll('.altersyn-card').forEach(card => {

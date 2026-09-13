@@ -515,7 +515,7 @@ altersyn.delete('/:id', requireAuth, requireAdmin, async (req, res, next) => {
 app.use('/api/altersyn',altersyn);app.use('/altersyn',altersyn);
 
 const doneAltresyn=express.Router();
-const doneAltresynSelect=`SELECT d.id,d."group" AS "group",d.amount,d.extra_doses,d.total_altersyn_ml,
+const doneAltresynSelect=`SELECT d.id,d.altersyn_id,d."group" AS "group",d.ventil,d.amount,d.extra_doses,d.total_altersyn_ml,
   d.done_date,d.given_by_user_id,u.username AS given_by_username,d.created_at,d.updated_at
   FROM donealtersyn d JOIN users u ON u.id=d.given_by_user_id`;
 doneAltresyn.get('/',requireAuth,async(_req,res,next)=>{try{res.json((await pool.query(doneAltresynSelect+' ORDER BY d.done_date DESC,d.id DESC')).rows);}catch(error){next(error);}});
@@ -776,7 +776,7 @@ injectionPwa.get('/altersyn-today', requireAuth, async (req, res, next) => {
   try {
     const date = normalizeDate(req.query.date || new Date(), 'date');
     const result = await pool.query(`SELECT a.id,a."group" AS "group",a.ventil,a.amount,
-      EXISTS(SELECT 1 FROM donealtersyn d WHERE d."group"=a."group" AND d.done_date=$1) AS completed
+      EXISTS(SELECT 1 FROM donealtersyn d WHERE d.altersyn_id=a.id AND d.done_date=$1) AS completed
       FROM altersyn a WHERE $1 BETWEEN a.altersyn_start_date AND a.altersyn_stop_date
       ORDER BY a."group",a.id`, [date]);
     res.json(result.rows);
@@ -787,19 +787,29 @@ injectionPwa.get('/altersyn-today', requireAuth, async (req, res, next) => {
 });
 
 injectionPwa.post('/altersyn/:id/complete', requireAuth, async (req, res, next) => {
+  const client = await pool.connect();
   try {
     const date = normalizeDate(req.body.done_date || new Date(), 'Date');
     const extraDoses = Number(req.body.extra_doses);
     if (!Number.isInteger(extraDoses) || extraDoses < 0) return res.status(400).json({ error: 'Extra doses must be a non-negative whole number' });
-    const record = (await pool.query(`SELECT id,"group" AS "group",amount FROM altersyn
-      WHERE id=$1 AND $2 BETWEEN altersyn_start_date AND altersyn_stop_date`, [req.params.id, date])).rows[0];
-    if (!record) return res.status(404).json({ error: 'No active Altresyn group was found for this date' });
-    const duplicate = await pool.query('SELECT id FROM donealtersyn WHERE "group"=$1 AND done_date=$2', [record.group, date]);
-    if (duplicate.rows[0]) return res.status(409).json({ error: 'This Altresyn group is already completed for today' });
-    const inserted = await pool.query(`INSERT INTO donealtersyn("group",amount,extra_doses,done_date,given_by_user_id)
-      VALUES($1,$2,$3,$4,$5) RETURNING id`, [record.group, record.amount, extraDoses, date, req.user.sub]);
+    await client.query('BEGIN');
+    const record = (await client.query(`SELECT id,"group" AS "group",ventil,amount FROM altersyn
+      WHERE id=$1 AND $2 BETWEEN altersyn_start_date AND altersyn_stop_date FOR UPDATE`, [req.params.id, date])).rows[0];
+    if (!record) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'No active Altresyn box was found for this date' });
+    }
+    const duplicate = await client.query('SELECT id FROM donealtersyn WHERE altersyn_id=$1 AND done_date=$2', [record.id, date]);
+    if (duplicate.rows[0]) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'This Altresyn box is already completed for today' });
+    }
+    const inserted = await client.query(`INSERT INTO donealtersyn(altersyn_id,"group",ventil,amount,extra_doses,done_date,given_by_user_id)
+      VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id`, [record.id, record.group, record.ventil, record.amount, extraDoses, date, req.user.sub]);
+    await client.query('COMMIT');
     res.status(201).json((await pool.query(doneAltresynSelect+' WHERE d.id=$1',[inserted.rows[0].id])).rows[0]);
-  } catch (error) { handleDbError(error, res, next); }
+  } catch (error) { await client.query('ROLLBACK').catch(()=>{});handleDbError(error, res, next); }
+  finally { client.release(); }
 });
 
 injectionPwa.post('/plans', requireAuth, async (req, res, next) => {
