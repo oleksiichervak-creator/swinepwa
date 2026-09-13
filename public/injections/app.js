@@ -110,7 +110,7 @@ function signOut() {
 }
 
 function showScreen(name) {
-  for (const screen of ['home', 'plan', 'today', 'altersyn-today', 'sow-info']) $(`#${screen}-screen`).hidden = screen !== name;
+  for (const screen of ['home', 'plan', 'today', 'vaccines-week', 'altersyn-today', 'sow-info']) $(`#${screen}-screen`).hidden = screen !== name;
   $('#back-button').hidden = name === 'home';
   $('#screen-title').textContent = '';
   $('#logout-button').hidden = name !== 'home';
@@ -396,6 +396,26 @@ $('#plan-form').addEventListener('submit', async event => {
   }
 });
 
+async function loadVaccinesWeek() {
+  const list=$('#vaccines-week-list');
+  list.innerHTML='<div class="empty">Loading…</div>';
+  try{
+    const result=await api(`/api/injection-pwa/vaccines-week?date=${localDate()}`);
+    $('#vaccines-week-period').textContent=`${result.start_date} — ${result.end_date}`;
+    list.innerHTML=result.items.length?result.items.map(item=>`<article class="injection-card weekly-vaccine-card"><header><div><small class="pen-label">VACCINE</small><h2>${escapeHtml(item.vaccine_name)}</h2></div><strong class="vaccine-group">Group ${escapeHtml(item.group_number)}</strong></header><div class="meta"><span>Date: <strong>${escapeHtml(item.vaccination_date)}</strong></span><span>Week: <strong>${item.week_number}</strong></span><span>Recipient: <strong>${escapeHtml(item.recipient)}</strong></span><span>Animals: <strong>${item.pig_count}</strong></span></div><div class="medicine">Planned use: ${formatDose(Number(item.pig_count)*Number(item.dose_ml))} ml</div><button class="complete-button vaccine-done" type="button" data-id="${item.id}">Done</button></article>`).join(''):'<div class="empty">No vaccinations planned for this week.</div>';
+    document.querySelectorAll('.vaccine-done').forEach(button=>button.addEventListener('click',()=>completeVaccinePlan(button)));
+  }catch(error){list.innerHTML=`<div class="empty">${escapeHtml(error.message)}</div>`;}
+}
+
+async function completeVaccinePlan(button){
+  button.disabled=true;
+  try{
+    await api(`/api/injection-pwa/vaccine-plans/${button.dataset.id}/complete`,{method:'POST'});
+    await loadVaccinesWeek();
+    toast('Vaccination registered');
+  }catch(error){button.disabled=false;toast(error.message);}
+}
+
 async function loadToday() {
   const list = $('#today-list');
   list.innerHTML = '<div class="empty">Loading…</div>';
@@ -569,6 +589,7 @@ $('#complete-form').addEventListener('submit', async event => {
 });
 
 $('#show-today').addEventListener('click', () => { showScreen('today'); loadToday(); });
+$('#show-vaccines-week').addEventListener('click', () => { showScreen('vaccines-week'); loadVaccinesWeek(); });
 $('#show-altersyn-today').addEventListener('click', () => { showScreen('altersyn-today'); loadAltersynToday(); });
 $('#show-sow-info').addEventListener('click', () => {
   showScreen('sow-info');

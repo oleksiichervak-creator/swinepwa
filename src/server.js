@@ -742,6 +742,36 @@ injectionPwa.get('/today', requireAuth, async (req, res, next) => {
   }
 });
 
+injectionPwa.get('/vaccines-week', requireAuth, async (req, res, next) => {
+  try {
+    const date=normalizeDate(req.query.date||new Date(),'date'),current=new Date(`${date}T00:00:00Z`),day=current.getUTCDay()||7;
+    current.setUTCDate(current.getUTCDate()-(day-1));
+    const startDate=current.toISOString().slice(0,10),endDate=addUtcDays(startDate,6);
+    const items=(await pool.query(`SELECT p.id,p.vaccine_id,v.name AS vaccine_name,v.dose_ml::float8 AS dose_ml,p.vaccination_date,p.week_number,p.group_number,p.recipient,p.insemination_year,p.pig_count
+      FROM planned_vaccines p JOIN vaccines v ON v.id=p.vaccine_id
+      WHERE p.vaccination_date BETWEEN $1 AND $2
+      ORDER BY p.vaccination_date,p.group_number,lower(v.name),p.recipient,p.id`,[startDate,endDate])).rows;
+    res.json({start_date:startDate,end_date:endDate,items});
+  } catch(error){if(error.status)return res.status(error.status).json({error:error.message});next(error);}
+});
+
+injectionPwa.post('/vaccine-plans/:id/complete', requireAuth, async (req, res, next) => {
+  const client=await pool.connect();
+  try{
+    await client.query('BEGIN');
+    const planned=(await client.query(`SELECT p.vaccine_id,p.week_number,p.group_number,p.recipient,p.pig_count,p.vaccination_date,v.dose_ml::float8 AS dose_ml
+      FROM planned_vaccines p JOIN vaccines v ON v.id=p.vaccine_id WHERE p.id=$1 FOR UPDATE OF p`,[req.params.id])).rows[0];
+    if(!planned){await client.query('ROLLBACK');return res.status(404).json({error:'Planned vaccination not found'});}
+    if(planned.pig_count==null||!planned.vaccination_date)throw Object.assign(new Error('This plan has no animal count or vaccination date'),{status:409});
+    const vaccineUsed=Number((Number(planned.pig_count)*Number(planned.dose_ml)).toFixed(3));
+    const inserted=await client.query(`INSERT INTO done_vaccines(vaccine_id,week_number,group_number,recipient,pig_count,vaccine_used_ml,vaccination_date,given_by_user_id)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,[planned.vaccine_id,planned.week_number,planned.group_number,planned.recipient,planned.pig_count,vaccineUsed,planned.vaccination_date,req.user.sub]);
+    await client.query('DELETE FROM planned_vaccines WHERE id=$1',[req.params.id]);
+    await client.query('COMMIT');
+    res.status(201).json({id:inserted.rows[0].id,vaccine_used_ml:vaccineUsed});
+  }catch(error){await client.query('ROLLBACK').catch(()=>{});handleDbError(error,res,next);}finally{client.release();}
+});
+
 injectionPwa.get('/altersyn-today', requireAuth, async (req, res, next) => {
   try {
     const date = normalizeDate(req.query.date || new Date(), 'date');
