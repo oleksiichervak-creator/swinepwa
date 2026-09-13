@@ -566,6 +566,18 @@ plannedVaccines.post('/make-plan',requireAuth,requireAdmin,async(req,res,next)=>
     res.status(201).json({group_number:String(groupWeek),insemination_year:year,total_count:totalCount,polte_count:polteCount,plans_created:created.length});
   }catch(error){await client.query('ROLLBACK').catch(()=>{});handleDbError(error,res,next);}finally{client.release();}
 });
+plannedVaccines.get('/group-print/:year/:group',requireAuth,async(req,res,next)=>{
+  try{
+    const year=wholeNumber(req.params.year,'Insemination year',2000,2100),group=wholeNumber(req.params.group,'Group number',1,53);
+    const items=(await pool.query(`SELECT p.vaccination_date,p.week_number,p.recipient,p.pig_count,v.name AS vaccine_name
+      FROM planned_vaccines p JOIN vaccines v ON v.id=p.vaccine_id
+      WHERE p.insemination_year=$1 AND p.group_number=$2
+      ORDER BY p.vaccination_date,lower(v.name),p.recipient,p.id`,[year,String(group)])).rows;
+    if(!items.length)return res.status(404).json({error:'No vaccination plan was found for this group'});
+    const rows=items.map(item=>`<tr><td>${html(normalizeDate(item.vaccination_date,'Vaccination date'))}</td><td>${html(item.week_number)}</td><td>${html(item.vaccine_name)}</td><td>${html(item.recipient)}</td><td class="number">${html(item.pig_count??'')}</td><td class="execution"></td></tr>`).join('');
+    res.type('html').send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Vaccination plan — group ${group} / ${year}</title><style>@page{size:A4 portrait;margin:14mm}*{box-sizing:border-box}body{margin:20px;font:12px Arial,sans-serif;color:#111}.print-button{margin-bottom:14px;padding:7px 14px}h1{margin:0 0 4px;text-align:center;font-size:20px}.subtitle{margin:0 0 18px;text-align:center;font-weight:bold;color:#333}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #333;padding:7px 6px;text-align:left;vertical-align:middle}th{background:#e8e8e8;font-size:10px;text-transform:uppercase}th:nth-child(1){width:16%}th:nth-child(2){width:8%}th:nth-child(3){width:25%}th:nth-child(4){width:12%}th:nth-child(5){width:11%}th:nth-child(6){width:28%}.number{text-align:center}.execution{height:34px}@media print{body{margin:0}.print-button{display:none}thead{display:table-header-group}}</style></head><body><button class="print-button" onclick="print()">Print</button><h1>Planned vaccinations</h1><p class="subtitle">Group ${group} · Insemination year ${year}</p><table><thead><tr><th>Date</th><th>Week</th><th>Vaccine</th><th>Recipient</th><th>Animals</th><th>Execution / Done</th></tr></thead><tbody>${rows}</tbody></table></body></html>`);
+  }catch(error){if(error.status)return res.status(error.status).json({error:error.message});next(error);}
+});
 app.use('/api/vaccines',vaccines);app.use('/vaccines',vaccines);
 app.use('/api/vaccination-schedules',vaccinationSchedules);app.use('/vaccination-schedules',vaccinationSchedules);
 app.use('/api/planned-vaccines',plannedVaccines);app.use('/planned-vaccines',plannedVaccines);
