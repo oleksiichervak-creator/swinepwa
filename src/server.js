@@ -602,14 +602,14 @@ seekplace.get('/print-card', async (req, res, next) => {
     const pigNumber = typeof req.query.pig_number === 'string' ? req.query.pig_number.trim() : '';
     if (!pigNumber || pigNumber.length > 100) return res.status(400).json({ error: 'Enter a pig number (maximum 100 characters)' });
     const registration = await pool.query(`SELECT ${seekplaceColumns} FROM seekplace WHERE pig_number=$1 ORDER BY registration_date DESC,id DESC LIMIT 1`, [pigNumber]);
-    if (!registration.rowCount) return res.status(404).json({ error: 'This pig is not registered in Seekplace' });
+    if (!registration.rowCount) return res.status(404).json({ error: 'This pig is not registered in Sickplace' });
     const period = (await pool.query("SELECT to_char((CURRENT_DATE - INTERVAL '1 month')::date,'YYYY-MM-DD') AS date_from,to_char(CURRENT_DATE,'YYYY-MM-DD') AS date_to")).rows[0];
     const medicines = await pool.query(`
-      SELECT to_char(i.injection_date,'YYYY-MM-DD') AS injection_date,'Planned' AS treatment_status,m.name AS medicine_name,i.dose_ml::float8 AS dose_ml,i.comment,i.id
+      SELECT to_char(i.injection_date,'YYYY-MM-DD') AS injection_date,'Planned' AS treatment_status,m.name AS medicine_name,m.diagnosis,i.dose_ml::float8 AS dose_ml,i.comment,i.id
       FROM planed_sow_injections i JOIN medicine_sow m ON m.id=i.medicine_sow_id
       WHERE i.sow_number=$1 AND i.injection_date BETWEEN $2::date AND $3::date
       UNION ALL
-      SELECT to_char(i.injection_date,'YYYY-MM-DD'),'Given',m.name,i.dose_ml::float8,i.comment,i.id
+      SELECT to_char(i.injection_date,'YYYY-MM-DD'),'Given',m.name,m.diagnosis,i.dose_ml::float8,i.comment,i.id
       FROM done_sow_injections i JOIN medicine_sow m ON m.id=i.medicine_sow_id
       WHERE i.sow_number=$1 AND i.injection_date BETWEEN $2::date AND $3::date
       ORDER BY injection_date,treatment_status,id`, [pigNumber, period.date_from, period.date_to]);
@@ -619,37 +619,40 @@ seekplace.get('/print-card', async (req, res, next) => {
 seekplace.get('/:id', async (req, res, next) => {
   try {
     const result = await pool.query(`SELECT ${seekplaceColumns} FROM seekplace WHERE id=$1`, [req.params.id]);
-    if (!result.rowCount) return res.status(404).json({ error: 'Seekplace record not found' });
+    if (!result.rowCount) return res.status(404).json({ error: 'Sickplace record not found' });
     res.json(result.rows[0]);
   } catch (error) { next(error); }
 });
-seekplace.post('/', requireAdmin, async (req, res, next) => {
+async function createSickplace(req, res, next) {
   try {
     const values = seekplaceValues(validateSeekplace(req.body));
     const result = await pool.query(`INSERT INTO seekplace(box_number,registration_date,pig_number,group_number,status) VALUES($1,$2,$3,$4,$5) RETURNING ${seekplaceColumns}`, values);
     res.status(201).json(result.rows[0]);
   } catch (error) { handleDbError(error, res, next); }
-});
+}
+seekplace.post('/', requireAdmin, createSickplace);
 seekplace.patch('/:id', requireAdmin, async (req, res, next) => {
   try {
     if (!['box_number', 'registration_date', 'pig_number', 'group_number', 'status'].some(key => Object.hasOwn(req.body || {}, key))) return res.status(400).json({ error: 'No fields to update' });
     const current = await pool.query(`SELECT ${seekplaceColumns} FROM seekplace WHERE id=$1`, [req.params.id]);
-    if (!current.rowCount) return res.status(404).json({ error: 'Seekplace record not found' });
+    if (!current.rowCount) return res.status(404).json({ error: 'Sickplace record not found' });
     const values = seekplaceValues(validateSeekplace({ ...current.rows[0], ...req.body }));
     const result = await pool.query(`UPDATE seekplace SET box_number=$1,registration_date=$2,pig_number=$3,group_number=$4,status=$5,updated_at=NOW() WHERE id=$6 RETURNING ${seekplaceColumns}`, [...values, req.params.id]);
-    if (!result.rowCount) return res.status(404).json({ error: 'Seekplace record not found' });
+    if (!result.rowCount) return res.status(404).json({ error: 'Sickplace record not found' });
     res.json(result.rows[0]);
   } catch (error) { handleDbError(error, res, next); }
 });
 seekplace.delete('/:id', requireAdmin, async (req, res, next) => {
   try {
     const result = await pool.query('DELETE FROM seekplace WHERE id=$1 RETURNING id', [req.params.id]);
-    if (!result.rowCount) return res.status(404).json({ error: 'Seekplace record not found' });
+    if (!result.rowCount) return res.status(404).json({ error: 'Sickplace record not found' });
     res.status(204).end();
   } catch (error) { next(error); }
 });
 app.use('/api/seekplace', seekplace);
 app.use('/seekplace', seekplace);
+app.use('/api/sickplace', seekplace);
+app.use('/sickplace', seekplace);
 
 const todos=express.Router();const todoSelect='SELECT id,task,due_date,is_completed,completed_at,created_at,updated_at FROM todo_items';
 todos.get('/',requireAuth,async(req,res,next)=>{try{const values=[];let where='';if(req.query.completed!==undefined){if(!['true','false'].includes(String(req.query.completed)))return res.status(400).json({error:'completed must be true or false'});values.push(req.query.completed==='true');where=' WHERE is_completed=$1';}res.json((await pool.query(todoSelect+where+' ORDER BY is_completed,due_date,id',values)).rows);}catch(e){next(e);}});
@@ -715,6 +718,17 @@ app.use('/api/planed-sow-injections', sowInjections);
 app.use('/planed-sow-injections', sowInjections);
 
 const injectionPwa = express.Router();
+injectionPwa.post('/sickplace', requireAuth, createSickplace);
+injectionPwa.patch('/sickplace/:id/status', requireAuth, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    if (!/^[1-9]\d*$/.test(id) || BigInt(id) > 9223372036854775807n) return res.status(400).json({ error: 'Invalid record ID' });
+    if (!req.body || Object.keys(req.body).length !== 1 || !['observation', 'recovered'].includes(req.body.status)) return res.status(400).json({ error: 'Provide only status: observation or recovered' });
+    const result = await pool.query(`UPDATE seekplace SET status=$1,updated_at=NOW() WHERE id=$2 RETURNING ${seekplaceColumns}`, [req.body.status, id]);
+    if (!result.rowCount) return res.status(404).json({ error: 'Sickplace record not found' });
+    res.json(result.rows[0]);
+  } catch (error) { handleDbError(error, res, next); }
+});
 let pigNewsCache = { expiresAt: 0, items: [] };
 
 injectionPwa.get('/news', requireAuth, async (_req, res, next) => {

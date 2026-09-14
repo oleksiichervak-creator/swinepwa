@@ -5,70 +5,70 @@ let doneSowItems = [];
 let doneSowSort = { key: 'injection_date', direction: 'asc' };
 let pigNewsLoaded = false;
 
-async function loadSeekplace() {
-  const items = await api('/seekplace/');
-  $('#seekplace-count').textContent = items.length;
-  $('#seekplace').innerHTML = items.length ? items.map(x => `<tr><td>${escapeHtml(x.box_number)}</td><td>${escapeHtml(x.registration_date)}</td><td>${escapeHtml(x.pig_number)}</td><td>${escapeHtml(x.group_number)}</td><td><span class="role">${escapeHtml(x.status)}</span></td><td><div class="row-actions">${me.role === 'admin' ? `<button class="secondary seekplace-edit" data-id="${x.id}">Edit</button><button class="danger seekplace-delete" data-id="${x.id}">Delete</button>` : ''}</div></td></tr>`).join('') : '<tr><td colspan="6" class="empty-state">No pigs registered yet.</td></tr>';
-  document.querySelectorAll('.seekplace-edit').forEach(button => button.onclick = () => openSeekplace(items.find(x => String(x.id) === button.dataset.id)));
-  document.querySelectorAll('.seekplace-delete').forEach(button => button.onclick = async () => {
+async function loadSickplace() {
+  const items = await api('/sickplace/');
+  $('#sickplace-count').textContent = items.length;
+  $('#sickplace').innerHTML = items.length ? items.map(x => `<tr><td>${escapeHtml(x.box_number)}</td><td>${escapeHtml(x.registration_date)}</td><td>${escapeHtml(x.pig_number)}</td><td>${escapeHtml(x.group_number)}</td><td><span class="role">${escapeHtml(x.status)}</span></td><td><div class="row-actions">${me.role === 'admin' ? `<button class="secondary sickplace-edit" data-id="${x.id}">Edit</button><button class="danger sickplace-delete" data-id="${x.id}">Delete</button>` : ''}</div></td></tr>`).join('') : '<tr><td colspan="6" class="empty-state">No pigs registered yet.</td></tr>';
+  document.querySelectorAll('.sickplace-edit').forEach(button => button.onclick = () => openSickplace(items.find(x => String(x.id) === button.dataset.id)));
+  document.querySelectorAll('.sickplace-delete').forEach(button => button.onclick = async () => {
     if (!confirm('Delete this registration?')) return;
-    try { await api(`/seekplace/${button.dataset.id}`, { method: 'DELETE' }); await loadSeekplace(); }
+    try { await api(`/sickplace/${button.dataset.id}`, { method: 'DELETE' }); await loadSickplace(); }
     catch (error) { alert(error.message); }
   });
 }
 
-function openSeekplace(item) {
-  const form = $('#seekplace-form');
+function openSickplace(item) {
+  const form = $('#sickplace-form');
   form.reset();
-  $('#seekplace-error').textContent = '';
-  $('#seekplace-dialog-title').textContent = item ? 'Edit registration' : 'Register pig';
+  $('#sickplace-error').textContent = '';
+  $('#sickplace-dialog-title').textContent = item ? 'Edit registration' : 'Register pig';
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const values = item || { registration_date: today, status: 'observation' };
   for (const key of ['id', 'box_number', 'registration_date', 'pig_number', 'group_number', 'status']) form.elements.namedItem(key).value = values[key] ?? '';
-  $('#seekplace-dialog').showModal();
+  $('#sickplace-dialog').showModal();
 }
 
-$('#add-seekplace').onclick = () => openSeekplace();
-$('#print-seekplace').onclick = () => {
-  $('#seekplace-print-form').reset();
-  $('#seekplace-print-error').textContent = '';
-  $('#seekplace-print-dialog').showModal();
+$('#add-sickplace').onclick = () => openSickplace();
+$('#print-sickplace').onclick = () => {
+  $('#sickplace-print-form').reset();
+  $('#sickplace-print-error').textContent = '';
+  $('#sickplace-print-dialog').showModal();
 };
-$('#seekplace-print-cancel').onclick = () => $('#seekplace-print-dialog').close();
-$('#seekplace-print-form').onsubmit = async event => {
+$('#sickplace-print-cancel').onclick = () => $('#sickplace-print-dialog').close();
+$('#sickplace-print-form').onsubmit = async event => {
   event.preventDefault();
   const pigNumber = event.currentTarget.elements.pig_number.value.trim();
-  $('#seekplace-print-error').textContent = '';
+  $('#sickplace-print-error').textContent = '';
   const popup = window.open('', '_blank');
-  if (!popup) { $('#seekplace-print-error').textContent = 'Allow pop-ups to open the print page.'; return; }
+  if (!popup) { $('#sickplace-print-error').textContent = 'Allow pop-ups to open the print page.'; return; }
   popup.document.write('<p style="font:20px Arial;padding:30px">Preparing print card…</p>');
   try {
-    const response = await fetch(`/api/seekplace/print-card?pig_number=${encodeURIComponent(pigNumber)}`, { headers: { Authorization: `Bearer ${token}` } });
+    const response = await fetch(`/api/sickplace/print-card?pig_number=${encodeURIComponent(pigNumber)}`, { headers: { Authorization: `Bearer ${token}` } });
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
       throw new Error(error.error || 'Unable to prepare print card');
     }
     const url = URL.createObjectURL(await response.blob());
     popup.location.href = url;
-    $('#seekplace-print-dialog').close();
+    $('#sickplace-print-dialog').close();
     setTimeout(() => URL.revokeObjectURL(url), 60000);
-  } catch (error) { popup.close(); $('#seekplace-print-error').textContent = error.message; }
+  } catch (error) { popup.close(); $('#sickplace-print-error').textContent = error.message; }
 };
-$('#seekplace-cancel').onclick = () => $('#seekplace-dialog').close();
-$('#seekplace-form').onsubmit = async event => {
+$('#sickplace-cancel').onclick = () => $('#sickplace-dialog').close();
+$('#sickplace-form').onsubmit = async event => {
   event.preventDefault();
   const form = event.target;
   const { id, ...data } = Object.fromEntries(new FormData(form));
   const submit = form.querySelector('[type="submit"]');
   submit.disabled = true;
-  $('#seekplace-error').textContent = '';
+  $('#sickplace-error').textContent = '';
   try {
-    await api(id ? `/seekplace/${id}` : '/seekplace/', { method: id ? 'PATCH' : 'POST', body: JSON.stringify(data) });
-    $('#seekplace-dialog').close();
-    await loadSeekplace();
+    await api(id ? `/sickplace/${id}` : '/sickplace/', { method: id ? 'PATCH' : 'POST', body: JSON.stringify(data) });
+    $('#sickplace-dialog').close();
+    await loadSickplace();
   } catch (error) {
-    if ($('#seekplace-dialog').open) $('#seekplace-error').textContent = error.message;
+    if ($('#sickplace-dialog').open) $('#sickplace-error').textContent = error.message;
     else alert(error.message);
   } finally { submit.disabled = false; }
 };
@@ -104,10 +104,11 @@ async function showAdmin() {
     $('#add-vaccine-group').hidden = me.role !== 'admin';
     $('#add-planned-vaccine').hidden = me.role !== 'admin';
     $('#add-done-vaccine').hidden = me.role !== 'admin';
-    $('#add-seekplace').hidden = me.role !== 'admin';
+    $('#add-sickplace').hidden = me.role !== 'admin';
     $('#add-todo').hidden = me.role !== 'admin';
-    await Promise.all([loadUsers(), loadDepartments(), loadRooms(), loadPens(), loadMedicineSow(), loadMedicineSowStorage(), loadSowInjections(), loadDoneSow(), loadVetQuestions(), loadFiles(), loadDailyRemarks(), loadRepairLocations(), loadAltresyn(), loadDoneAltresyn(), loadVaccines(), loadVaccinationSchedules(), loadPlannedVaccines(), loadDoneVaccines(), loadTodos(), loadSeekplace()]);
-    const requestedPage = ['#departments','#rooms','#pens','#medicine-sow','#medicine-sow-storage','#sow-injections','#done-sow','#vet-questions','#file-storage','#daily-remarks','#repair-locations','#altersyn','#done-altersyn','#vaccines','#vaccination-schedules','#planned-vaccines','#done-vaccines','#todos','#seekplace','#pig-news','#pig-game'].includes(location.hash) ? location.hash.slice(1) : 'users';
+    await Promise.all([loadUsers(), loadDepartments(), loadRooms(), loadPens(), loadMedicineSow(), loadMedicineSowStorage(), loadSowInjections(), loadDoneSow(), loadVetQuestions(), loadFiles(), loadDailyRemarks(), loadRepairLocations(), loadAltresyn(), loadDoneAltresyn(), loadVaccines(), loadVaccinationSchedules(), loadPlannedVaccines(), loadDoneVaccines(), loadTodos(), loadSickplace()]);
+    if (location.hash === '#seekplace') history.replaceState(null, '', '#sickplace');
+    const requestedPage = ['#departments','#rooms','#pens','#medicine-sow','#medicine-sow-storage','#sow-injections','#done-sow','#vet-questions','#file-storage','#daily-remarks','#repair-locations','#altersyn','#done-altersyn','#vaccines','#vaccination-schedules','#planned-vaccines','#done-vaccines','#todos','#sickplace','#pig-news','#pig-game'].includes(location.hash) ? location.hash.slice(1) : 'users';
     switchPage(requestedPage);
   } catch { logout(); }
 }
@@ -246,7 +247,7 @@ function switchPage(page) {
     const active = item.dataset.page === page;
     item.classList.toggle('active', active); item.setAttribute('aria-selected', String(active));
   });
-  $('#seekplace-page').hidden=page!=='seekplace';
+  $('#sickplace-page').hidden=page!=='sickplace';
   $('#users-page').hidden=page!=='users';$('#departments-page').hidden=page!=='departments';$('#rooms-page').hidden=page!=='rooms';$('#pens-page').hidden=page!=='pens';$('#medicine-sow-page').hidden=page!=='medicine-sow';$('#medicine-sow-storage-page').hidden=page!=='medicine-sow-storage';$('#sow-injections-page').hidden=page!=='sow-injections';$('#done-sow-page').hidden=page!=='done-sow';$('#vet-questions-page').hidden=page!=='vet-questions';$('#file-storage-page').hidden=page!=='file-storage';$('#daily-remarks-page').hidden=page!=='daily-remarks';$('#repair-locations-page').hidden=page!=='repair-locations';$('#altersyn-page').hidden=page!=='altersyn';$('#done-altersyn-page').hidden=page!=='done-altersyn';$('#todos-page').hidden=page!=='todos';$('#pig-news-page').hidden=page!=='pig-news';$('#pig-game-page').hidden=page!=='pig-game';
   $('#vaccines-page').hidden=page!=='vaccines';$('#vaccination-schedules-page').hidden=page!=='vaccination-schedules';$('#planned-vaccines-page').hidden=page!=='planned-vaccines';$('#done-vaccines-page').hidden=page!=='done-vaccines';
   if(page==='pig-news'&&!pigNewsLoaded)loadPigNews();

@@ -11,6 +11,7 @@ let altersynTodayItems = [];
 let references = null;
 let sowHistoryItems = [];
 let installPrompt = null;
+let sickplaceItems = [];
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -100,6 +101,9 @@ async function enterApp() {
 }
 
 function signOut() {
+  sickplaceItems = [];
+  $('#sickplace-list').innerHTML = '';
+  $('#sickplace-dialog').close();
   token = '';
   currentUser = null;
   references = null;
@@ -110,9 +114,9 @@ function signOut() {
 }
 
 function showScreen(name) {
-  for (const screen of ['home', 'plan', 'today', 'vaccines-week', 'altersyn-today', 'sow-info']) $(`#${screen}-screen`).hidden = screen !== name;
+  for (const screen of ['home', 'plan', 'today', 'vaccines-week', 'altersyn-today', 'sow-info', 'sickplace']) $(`#${screen}-screen`).hidden = screen !== name;
   $('#back-button').hidden = name === 'home';
-  $('#screen-title').textContent = '';
+  $('#screen-title').textContent = name === 'sickplace' ? 'Sickplace' : '';
   $('#logout-button').hidden = name !== 'home';
 }
 
@@ -307,6 +311,76 @@ function updateDosePreview() {
     <div><span>${escapeHtml(medicine.name)} · ${selectedMelovem ? daysLabel(melovemDays) : courseLabel(medicine)}</span><strong>${formatDose(dose)} ml/day</strong></div>
     ${includeMelovem ? `<div><span>Melovem · ${daysLabel(melovemDays)}</span><strong>${formatDose(calculateDose(melovem, weight))} ml/day</strong></div>` : ''}`;
 }
+
+async function loadSickplace() {
+  $('#sickplace-error').textContent = '';
+  $('#sickplace-list').innerHTML = '<p class="empty">Loading pigs…</p>';
+  try {
+    sickplaceItems = await api('/api/sickplace/');
+    renderSickplace();
+  } catch (error) {
+    sickplaceItems = [];
+    $('#sickplace-list').innerHTML = '';
+    $('#sickplace-error').textContent = error.message;
+  }
+}
+
+function renderSickplace() {
+  const search = $('#sickplace-search').value.trim().toLowerCase();
+  const items = sickplaceItems.filter(item => item.pig_number.toLowerCase().includes(search));
+  $('#sickplace-list').innerHTML = items.length ? items.map(item => `<article class="injection-card">
+    <header><h2>Pig ${escapeHtml(item.pig_number)}</h2><strong>Group ${escapeHtml(item.group_number)}</strong></header>
+    <div class="meta"><span>Box: ${escapeHtml(item.box_number)}</span><span>Registered: ${escapeHtml(item.registration_date)}</span></div>
+    <form class="sickplace-status-form" data-id="${item.id}">
+      <label>Status<select name="status"><option value="observation" ${item.status === 'observation' ? 'selected' : ''}>observation</option><option value="recovered" ${item.status === 'recovered' ? 'selected' : ''}>recovered</option></select></label>
+      <p class="error" role="alert"></p><button type="submit">Save status</button>
+    </form></article>`).join('') : `<p class="empty">${search ? 'No pigs match this number.' : 'No pigs registered yet.'}</p>`;
+  document.querySelectorAll('.sickplace-status-form').forEach(form => form.addEventListener('submit', async event => {
+    event.preventDefault();
+    const button = form.querySelector('button');
+    const select = form.elements.status;
+    button.disabled = true;
+    select.disabled = true;
+    form.querySelector('.error').textContent = '';
+    try {
+      const updated = await api(`/api/injection-pwa/sickplace/${form.dataset.id}/status`, { method: 'PATCH', body: JSON.stringify({ status: select.value }) });
+      sickplaceItems = sickplaceItems.map(item => item.id === updated.id ? updated : item);
+      toast('Status saved');
+    } catch (error) { form.querySelector('.error').textContent = error.message; }
+    finally { button.disabled = false; select.disabled = false; }
+  }));
+}
+
+$('#show-sickplace').addEventListener('click', () => {
+  showScreen('sickplace');
+  $('#sickplace-search').value = '';
+  loadSickplace();
+});
+$('#sickplace-refresh').addEventListener('click', loadSickplace);
+$('#sickplace-search').addEventListener('input', renderSickplace);
+$('#sickplace-add').addEventListener('click', () => {
+  const form = $('#sickplace-form');
+  form.reset();
+  form.elements.registration_date.value = localDate();
+  $('#sickplace-form-error').textContent = '';
+  $('#sickplace-dialog').showModal();
+});
+$('#sickplace-close').addEventListener('click', () => $('#sickplace-dialog').close());
+$('#sickplace-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = form.querySelector('[type="submit"]');
+  button.disabled = true;
+  $('#sickplace-form-error').textContent = '';
+  try {
+    await api('/api/injection-pwa/sickplace', { method: 'POST', body: JSON.stringify(Object.fromEntries(new FormData(form))) });
+    $('#sickplace-dialog').close();
+    $('#sickplace-search').value = '';
+    toast('Pig registered');
+    await loadSickplace();
+  } catch (error) { $('#sickplace-form-error').textContent = error.message; }
+  finally { button.disabled = false; }
+});
 
 function renderMelovemCalendar() {
   const baseDate = $('#plan-form').injection_date.value;

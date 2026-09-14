@@ -11,6 +11,17 @@ test('card includes ten consecutive inspection dates across a year boundary and 
   assert.ok(page.includes('&lt;Drug&gt;'));
   assert.ok(!page.includes('<script>'));
   assert.ok(page.includes('007'));
+  assert.ok(page.includes('<th>Diagnosis</th>'));
+});
+
+test('card displays and escapes the diagnosis for each medicine', () => {
+  const page = renderSeekplaceCard({ registration_date: '2026-09-14' }, [
+    { medicine_name: 'A', treatment_status: 'Planned', diagnosis: 'Diagnosis A' },
+    { medicine_name: 'B', treatment_status: 'Given', diagnosis: '<Diagnosis B>' },
+  ], {});
+  assert.ok(page.includes('<td>Diagnosis A</td>'));
+  assert.ok(page.includes('<td>&lt;Diagnosis B&gt;</td>'));
+  assert.ok(!page.includes('<Diagnosis B>'));
 });
 test('card handles an empty medicine history', () => {
   const page = renderSeekplaceCard({ registration_date: '2028-02-25' }, [], {});
