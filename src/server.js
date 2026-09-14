@@ -1,5 +1,6 @@
 import express from 'express';
 import { validateSeekplace } from './seekplace.js';
+import { renderSeekplaceCard } from './seekplace-card.js';
 import bcrypt from 'bcryptjs';
 import ExcelJS from 'exceljs';
 import multer from 'multer';
@@ -595,6 +596,25 @@ seekplace.param('id', (req, res, next, id) => {
 seekplace.get('/', async (req, res, next) => {
   try { res.json((await pool.query(`SELECT ${seekplaceColumns} FROM seekplace ORDER BY registration_date DESC,id DESC`)).rows); }
   catch (error) { next(error); }
+});
+seekplace.get('/print-card', async (req, res, next) => {
+  try {
+    const pigNumber = typeof req.query.pig_number === 'string' ? req.query.pig_number.trim() : '';
+    if (!pigNumber || pigNumber.length > 100) return res.status(400).json({ error: 'Enter a pig number (maximum 100 characters)' });
+    const registration = await pool.query(`SELECT ${seekplaceColumns} FROM seekplace WHERE pig_number=$1 ORDER BY registration_date DESC,id DESC LIMIT 1`, [pigNumber]);
+    if (!registration.rowCount) return res.status(404).json({ error: 'This pig is not registered in Seekplace' });
+    const period = (await pool.query("SELECT to_char((CURRENT_DATE - INTERVAL '1 month')::date,'YYYY-MM-DD') AS date_from,to_char(CURRENT_DATE,'YYYY-MM-DD') AS date_to")).rows[0];
+    const medicines = await pool.query(`
+      SELECT to_char(i.injection_date,'YYYY-MM-DD') AS injection_date,'Planned' AS treatment_status,m.name AS medicine_name,i.dose_ml::float8 AS dose_ml,i.comment,i.id
+      FROM planed_sow_injections i JOIN medicine_sow m ON m.id=i.medicine_sow_id
+      WHERE i.sow_number=$1 AND i.injection_date BETWEEN $2::date AND $3::date
+      UNION ALL
+      SELECT to_char(i.injection_date,'YYYY-MM-DD'),'Given',m.name,i.dose_ml::float8,i.comment,i.id
+      FROM done_sow_injections i JOIN medicine_sow m ON m.id=i.medicine_sow_id
+      WHERE i.sow_number=$1 AND i.injection_date BETWEEN $2::date AND $3::date
+      ORDER BY injection_date,treatment_status,id`, [pigNumber, period.date_from, period.date_to]);
+    res.set('Cache-Control', 'no-store').type('html').send(renderSeekplaceCard(registration.rows[0], medicines.rows, period));
+  } catch (error) { next(error); }
 });
 seekplace.get('/:id', async (req, res, next) => {
   try {

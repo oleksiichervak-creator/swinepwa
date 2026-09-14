@@ -24,6 +24,8 @@ docker compose up --build
 - Box, pig and group numbers are text identifiers, preserving leading zeros; box numbers are entered manually.
 - Authenticated users can view records; administrators can add, edit and delete them.
 - The `seekplace` PostgreSQL table is created automatically when the updated server starts.
+- **Print card** asks for a pig number and uses its latest registration. The printable A4 card includes pig/group numbers, planned and given sow medicine from one calendar month before printing through today, and 10 blank daily inspection rows starting on the registration date.
+- `GET /api/seekplace/print-card?pig_number=...` returns the card HTML for authenticated users, or 404 when the pig is not registered.
 
 - `POST /api/auth/login`
 - `GET /api/auth/me`

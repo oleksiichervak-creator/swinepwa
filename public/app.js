@@ -30,6 +30,31 @@ function openSeekplace(item) {
 }
 
 $('#add-seekplace').onclick = () => openSeekplace();
+$('#print-seekplace').onclick = () => {
+  $('#seekplace-print-form').reset();
+  $('#seekplace-print-error').textContent = '';
+  $('#seekplace-print-dialog').showModal();
+};
+$('#seekplace-print-cancel').onclick = () => $('#seekplace-print-dialog').close();
+$('#seekplace-print-form').onsubmit = async event => {
+  event.preventDefault();
+  const pigNumber = event.currentTarget.elements.pig_number.value.trim();
+  $('#seekplace-print-error').textContent = '';
+  const popup = window.open('', '_blank');
+  if (!popup) { $('#seekplace-print-error').textContent = 'Allow pop-ups to open the print page.'; return; }
+  popup.document.write('<p style="font:20px Arial;padding:30px">Preparing print card…</p>');
+  try {
+    const response = await fetch(`/api/seekplace/print-card?pig_number=${encodeURIComponent(pigNumber)}`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'Unable to prepare print card');
+    }
+    const url = URL.createObjectURL(await response.blob());
+    popup.location.href = url;
+    $('#seekplace-print-dialog').close();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (error) { popup.close(); $('#seekplace-print-error').textContent = error.message; }
+};
 $('#seekplace-cancel').onclick = () => $('#seekplace-dialog').close();
 $('#seekplace-form').onsubmit = async event => {
   event.preventDefault();
