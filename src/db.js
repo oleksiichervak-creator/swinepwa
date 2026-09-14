@@ -12,6 +12,19 @@ export const pool = new Pool(process.env.DATABASE_URL ? { connectionString: proc
 
 export async function initializeDatabase() {
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS seekplace (
+      id BIGSERIAL PRIMARY KEY,
+      box_number VARCHAR(150) NOT NULL CHECK (length(trim(box_number)) > 0),
+      registration_date DATE NOT NULL,
+      pig_number VARCHAR(100) NOT NULL CHECK (length(trim(pig_number)) > 0),
+      group_number VARCHAR(150) NOT NULL CHECK (length(trim(group_number)) > 0),
+      status VARCHAR(20) NOT NULL DEFAULT 'observation' CHECK (status IN ('recovered', 'observation')),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
       id BIGSERIAL PRIMARY KEY,
       username VARCHAR(100) NOT NULL UNIQUE,

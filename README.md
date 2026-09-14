@@ -17,6 +17,14 @@ docker compose up --build
 
 ## API
 
+### Seekplace
+
+- Tab: `#seekplace`; CRUD routes: `/api/seekplace/` and `/seekplace/` (GET, POST, GET/PATCH/DELETE `/:id`).
+- Fields: box number, registration date, pig number, group number, status (`observation` by default or `recovered`).
+- Box, pig and group numbers are text identifiers, preserving leading zeros; box numbers are entered manually.
+- Authenticated users can view records; administrators can add, edit and delete them.
+- The `seekplace` PostgreSQL table is created automatically when the updated server starts.
+
 - `POST /api/auth/login`
 - `GET /api/auth/me`
 - `GET /api/users` и `GET /api/users/:id` — авторизованные пользователи

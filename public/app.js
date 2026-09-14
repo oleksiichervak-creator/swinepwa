@@ -5,6 +5,49 @@ let doneSowItems = [];
 let doneSowSort = { key: 'injection_date', direction: 'asc' };
 let pigNewsLoaded = false;
 
+async function loadSeekplace() {
+  const items = await api('/seekplace/');
+  $('#seekplace-count').textContent = items.length;
+  $('#seekplace').innerHTML = items.length ? items.map(x => `<tr><td>${escapeHtml(x.box_number)}</td><td>${escapeHtml(x.registration_date)}</td><td>${escapeHtml(x.pig_number)}</td><td>${escapeHtml(x.group_number)}</td><td><span class="role">${escapeHtml(x.status)}</span></td><td><div class="row-actions">${me.role === 'admin' ? `<button class="secondary seekplace-edit" data-id="${x.id}">Edit</button><button class="danger seekplace-delete" data-id="${x.id}">Delete</button>` : ''}</div></td></tr>`).join('') : '<tr><td colspan="6" class="empty-state">No pigs registered yet.</td></tr>';
+  document.querySelectorAll('.seekplace-edit').forEach(button => button.onclick = () => openSeekplace(items.find(x => String(x.id) === button.dataset.id)));
+  document.querySelectorAll('.seekplace-delete').forEach(button => button.onclick = async () => {
+    if (!confirm('Delete this registration?')) return;
+    try { await api(`/seekplace/${button.dataset.id}`, { method: 'DELETE' }); await loadSeekplace(); }
+    catch (error) { alert(error.message); }
+  });
+}
+
+function openSeekplace(item) {
+  const form = $('#seekplace-form');
+  form.reset();
+  $('#seekplace-error').textContent = '';
+  $('#seekplace-dialog-title').textContent = item ? 'Edit registration' : 'Register pig';
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const values = item || { registration_date: today, status: 'observation' };
+  for (const key of ['id', 'box_number', 'registration_date', 'pig_number', 'group_number', 'status']) form.elements.namedItem(key).value = values[key] ?? '';
+  $('#seekplace-dialog').showModal();
+}
+
+$('#add-seekplace').onclick = () => openSeekplace();
+$('#seekplace-cancel').onclick = () => $('#seekplace-dialog').close();
+$('#seekplace-form').onsubmit = async event => {
+  event.preventDefault();
+  const form = event.target;
+  const { id, ...data } = Object.fromEntries(new FormData(form));
+  const submit = form.querySelector('[type="submit"]');
+  submit.disabled = true;
+  $('#seekplace-error').textContent = '';
+  try {
+    await api(id ? `/seekplace/${id}` : '/seekplace/', { method: id ? 'PATCH' : 'POST', body: JSON.stringify(data) });
+    $('#seekplace-dialog').close();
+    await loadSeekplace();
+  } catch (error) {
+    if ($('#seekplace-dialog').open) $('#seekplace-error').textContent = error.message;
+    else alert(error.message);
+  } finally { submit.disabled = false; }
+};
+
 async function api(path, options = {}) {
   const response = await fetch('/api' + path, { ...options, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...options.headers } });
   if (response.status === 401) logout();
@@ -36,9 +79,10 @@ async function showAdmin() {
     $('#add-vaccine-group').hidden = me.role !== 'admin';
     $('#add-planned-vaccine').hidden = me.role !== 'admin';
     $('#add-done-vaccine').hidden = me.role !== 'admin';
+    $('#add-seekplace').hidden = me.role !== 'admin';
     $('#add-todo').hidden = me.role !== 'admin';
-    await Promise.all([loadUsers(), loadDepartments(), loadRooms(), loadPens(), loadMedicineSow(), loadMedicineSowStorage(), loadSowInjections(), loadDoneSow(), loadVetQuestions(), loadFiles(), loadDailyRemarks(), loadRepairLocations(), loadAltresyn(), loadDoneAltresyn(), loadVaccines(), loadVaccinationSchedules(), loadPlannedVaccines(), loadDoneVaccines(), loadTodos()]);
-    const requestedPage = ['#departments','#rooms','#pens','#medicine-sow','#medicine-sow-storage','#sow-injections','#done-sow','#vet-questions','#file-storage','#daily-remarks','#repair-locations','#altersyn','#done-altersyn','#vaccines','#vaccination-schedules','#planned-vaccines','#done-vaccines','#todos','#pig-news','#pig-game'].includes(location.hash) ? location.hash.slice(1) : 'users';
+    await Promise.all([loadUsers(), loadDepartments(), loadRooms(), loadPens(), loadMedicineSow(), loadMedicineSowStorage(), loadSowInjections(), loadDoneSow(), loadVetQuestions(), loadFiles(), loadDailyRemarks(), loadRepairLocations(), loadAltresyn(), loadDoneAltresyn(), loadVaccines(), loadVaccinationSchedules(), loadPlannedVaccines(), loadDoneVaccines(), loadTodos(), loadSeekplace()]);
+    const requestedPage = ['#departments','#rooms','#pens','#medicine-sow','#medicine-sow-storage','#sow-injections','#done-sow','#vet-questions','#file-storage','#daily-remarks','#repair-locations','#altersyn','#done-altersyn','#vaccines','#vaccination-schedules','#planned-vaccines','#done-vaccines','#todos','#seekplace','#pig-news','#pig-game'].includes(location.hash) ? location.hash.slice(1) : 'users';
     switchPage(requestedPage);
   } catch { logout(); }
 }
@@ -177,6 +221,7 @@ function switchPage(page) {
     const active = item.dataset.page === page;
     item.classList.toggle('active', active); item.setAttribute('aria-selected', String(active));
   });
+  $('#seekplace-page').hidden=page!=='seekplace';
   $('#users-page').hidden=page!=='users';$('#departments-page').hidden=page!=='departments';$('#rooms-page').hidden=page!=='rooms';$('#pens-page').hidden=page!=='pens';$('#medicine-sow-page').hidden=page!=='medicine-sow';$('#medicine-sow-storage-page').hidden=page!=='medicine-sow-storage';$('#sow-injections-page').hidden=page!=='sow-injections';$('#done-sow-page').hidden=page!=='done-sow';$('#vet-questions-page').hidden=page!=='vet-questions';$('#file-storage-page').hidden=page!=='file-storage';$('#daily-remarks-page').hidden=page!=='daily-remarks';$('#repair-locations-page').hidden=page!=='repair-locations';$('#altersyn-page').hidden=page!=='altersyn';$('#done-altersyn-page').hidden=page!=='done-altersyn';$('#todos-page').hidden=page!=='todos';$('#pig-news-page').hidden=page!=='pig-news';$('#pig-game-page').hidden=page!=='pig-game';
   $('#vaccines-page').hidden=page!=='vaccines';$('#vaccination-schedules-page').hidden=page!=='vaccination-schedules';$('#planned-vaccines-page').hidden=page!=='planned-vaccines';$('#done-vaccines-page').hidden=page!=='done-vaccines';
   if(page==='pig-news'&&!pigNewsLoaded)loadPigNews();

@@ -1,4 +1,5 @@
 import express from 'express';
+import { validateSeekplace } from './seekplace.js';
 import bcrypt from 'bcryptjs';
 import ExcelJS from 'exceljs';
 import multer from 'multer';
@@ -582,6 +583,53 @@ app.use('/api/vaccines',vaccines);app.use('/vaccines',vaccines);
 app.use('/api/vaccination-schedules',vaccinationSchedules);app.use('/vaccination-schedules',vaccinationSchedules);
 app.use('/api/planned-vaccines',plannedVaccines);app.use('/planned-vaccines',plannedVaccines);
 app.use('/api/done-vaccines',doneVaccines);app.use('/done-vaccines',doneVaccines);
+
+const seekplace = express.Router();
+const seekplaceColumns = "id,box_number,to_char(registration_date,'YYYY-MM-DD') AS registration_date,pig_number,group_number,status,created_at,updated_at";
+const seekplaceValues = x => [x.box_number, x.registration_date, x.pig_number, x.group_number, x.status];
+seekplace.use(requireAuth);
+seekplace.param('id', (req, res, next, id) => {
+  if (!/^[1-9]\d*$/.test(id) || BigInt(id) > 9223372036854775807n) return res.status(400).json({ error: 'Invalid record ID' });
+  next();
+});
+seekplace.get('/', async (req, res, next) => {
+  try { res.json((await pool.query(`SELECT ${seekplaceColumns} FROM seekplace ORDER BY registration_date DESC,id DESC`)).rows); }
+  catch (error) { next(error); }
+});
+seekplace.get('/:id', async (req, res, next) => {
+  try {
+    const result = await pool.query(`SELECT ${seekplaceColumns} FROM seekplace WHERE id=$1`, [req.params.id]);
+    if (!result.rowCount) return res.status(404).json({ error: 'Seekplace record not found' });
+    res.json(result.rows[0]);
+  } catch (error) { next(error); }
+});
+seekplace.post('/', requireAdmin, async (req, res, next) => {
+  try {
+    const values = seekplaceValues(validateSeekplace(req.body));
+    const result = await pool.query(`INSERT INTO seekplace(box_number,registration_date,pig_number,group_number,status) VALUES($1,$2,$3,$4,$5) RETURNING ${seekplaceColumns}`, values);
+    res.status(201).json(result.rows[0]);
+  } catch (error) { handleDbError(error, res, next); }
+});
+seekplace.patch('/:id', requireAdmin, async (req, res, next) => {
+  try {
+    if (!['box_number', 'registration_date', 'pig_number', 'group_number', 'status'].some(key => Object.hasOwn(req.body || {}, key))) return res.status(400).json({ error: 'No fields to update' });
+    const current = await pool.query(`SELECT ${seekplaceColumns} FROM seekplace WHERE id=$1`, [req.params.id]);
+    if (!current.rowCount) return res.status(404).json({ error: 'Seekplace record not found' });
+    const values = seekplaceValues(validateSeekplace({ ...current.rows[0], ...req.body }));
+    const result = await pool.query(`UPDATE seekplace SET box_number=$1,registration_date=$2,pig_number=$3,group_number=$4,status=$5,updated_at=NOW() WHERE id=$6 RETURNING ${seekplaceColumns}`, [...values, req.params.id]);
+    if (!result.rowCount) return res.status(404).json({ error: 'Seekplace record not found' });
+    res.json(result.rows[0]);
+  } catch (error) { handleDbError(error, res, next); }
+});
+seekplace.delete('/:id', requireAdmin, async (req, res, next) => {
+  try {
+    const result = await pool.query('DELETE FROM seekplace WHERE id=$1 RETURNING id', [req.params.id]);
+    if (!result.rowCount) return res.status(404).json({ error: 'Seekplace record not found' });
+    res.status(204).end();
+  } catch (error) { next(error); }
+});
+app.use('/api/seekplace', seekplace);
+app.use('/seekplace', seekplace);
 
 const todos=express.Router();const todoSelect='SELECT id,task,due_date,is_completed,completed_at,created_at,updated_at FROM todo_items';
 todos.get('/',requireAuth,async(req,res,next)=>{try{const values=[];let where='';if(req.query.completed!==undefined){if(!['true','false'].includes(String(req.query.completed)))return res.status(400).json({error:'completed must be true or false'});values.push(req.query.completed==='true');where=' WHERE is_completed=$1';}res.json((await pool.query(todoSelect+where+' ORDER BY is_completed,due_date,id',values)).rows);}catch(e){next(e);}});
