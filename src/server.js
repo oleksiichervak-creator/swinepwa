@@ -603,7 +603,7 @@ seekplace.get('/print-card', async (req, res, next) => {
     if (!pigNumber || pigNumber.length > 100) return res.status(400).json({ error: 'Enter a pig number (maximum 100 characters)' });
     const registration = await pool.query(`SELECT ${seekplaceColumns} FROM seekplace WHERE pig_number=$1 ORDER BY registration_date DESC,id DESC LIMIT 1`, [pigNumber]);
     if (!registration.rowCount) return res.status(404).json({ error: 'This pig is not registered in Sickplace' });
-    const period = (await pool.query("SELECT to_char((CURRENT_DATE - INTERVAL '1 month')::date,'YYYY-MM-DD') AS date_from,to_char(CURRENT_DATE,'YYYY-MM-DD') AS date_to")).rows[0];
+    const period = (await pool.query("SELECT to_char((CURRENT_DATE - INTERVAL '3 months')::date,'YYYY-MM-DD') AS date_from,to_char(CURRENT_DATE,'YYYY-MM-DD') AS date_to")).rows[0];
     const medicines = await pool.query(`
       SELECT to_char(i.injection_date,'YYYY-MM-DD') AS injection_date,'Planned' AS treatment_status,m.name AS medicine_name,m.diagnosis,i.dose_ml::float8 AS dose_ml,i.comment,i.id
       FROM planed_sow_injections i JOIN medicine_sow m ON m.id=i.medicine_sow_id

@@ -26,7 +26,7 @@ docker compose up --build
 - The phone app at `/injections/` includes Sickplace with pig search, registration and status updates for signed-in users. Mobile writes use `POST /api/injection-pwa/sickplace` and `PATCH /api/injection-pwa/sickplace/:id/status`; the latter accepts only `status`.
 - Existing `/seekplace` API routes and the `#seekplace` bookmark remain compatible.
 - The `seekplace` PostgreSQL table is created automatically when the updated server starts.
-- **Print card** asks for a pig number and uses its latest registration. The printable A4 card includes pig/group numbers, planned and given sow medicine with the corresponding diagnosis from one calendar month before printing through today, and 10 blank daily inspection rows starting on the registration date.
+- **Print card** asks for a pig number and uses its latest registration. The printable A4 card includes pig/group numbers, planned and given sow medicine with the corresponding diagnosis from three calendar months before printing through today, and 10 blank daily inspection rows starting on the registration date.
 - `GET /api/sickplace/print-card?pig_number=...` returns the card HTML for authenticated users, or 404 when the pig is not registered.
 
 - `POST /api/auth/login`
