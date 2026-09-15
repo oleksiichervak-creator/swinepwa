@@ -10,7 +10,8 @@ test('card includes ten consecutive inspection dates across a year boundary and 
   assert.ok(!page.includes('2027-01-07'));
   assert.ok(page.includes('&lt;123&gt;'));
   assert.ok(page.includes('&lt;Drug&gt;'));
-  assert.ok(!page.includes('<script>'));
+  assert.ok(!page.includes('<script>alert(1)</script>'));
+  assert.ok(page.includes('&lt;script&gt;alert(1)&lt;/script&gt;'));
   assert.ok(page.includes('007'));
   assert.ok(page.includes('<th>Diagnosis</th>'));
 });
