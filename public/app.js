@@ -2,7 +2,7 @@ import { setupFarestald } from './farestald.js';
 const $ = (selector) => document.querySelector(selector);
 let token = localStorage.getItem('token');
 let me = null;
-const farestald = setupFarestald({ api, getUser: () => me });
+const farestald = setupFarestald({ api, getUser: () => me, getToken: () => token });
 let doneSowItems = [];
 let doneSowSort = { key: 'injection_date', direction: 'asc' };
 

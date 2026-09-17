@@ -9,17 +9,42 @@ const sections = [
 ];
 const escape = value => String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-export function setupFarestald({api,getUser}) {
+export function setupFarestald({api,getUser,getToken}) {
   const $ = selector => document.querySelector(selector);
   const nav = $('#farestald-navigation');
   nav.innerHTML = ['Medicine','Sow injections'].map(group=>`<details class="nav-group"><summary>${group}</summary><div class="nav-group-items" role="group" aria-label="Farestald ${group}">${sections.filter(s=>s.group===group).map(s=>`<button class="nav-button" role="tab" aria-selected="false" aria-controls="farestald-${s.key}-page" data-page="farestald-${s.key}">${s.title}<span class="count" id="farestald-${s.key}-count">0</span></button>`).join('')}</div></details>`).join('');
   const caches = new Map();
   for (const section of sections) {
     const prefix = `farestald-${section.key}`;
-    $('#admin').insertAdjacentHTML('beforeend',`<section id="${prefix}-page" role="tabpanel" hidden><div class="toolbar"><p>Farestald · ${section.title}</p><div>${section.key==='medicine-sow'?'<a class="pwa-install-link" href="/farestald-injections/?install=1" style="display:inline-flex;align-items:center;border-radius:9px;padding:11px 18px;background:#286445;color:#fff;font-weight:700;text-decoration:none">Install Farestald Injections</a>':''}<button id="${prefix}-add">+ Add record</button></div></div><label>Search<input type="search" id="${prefix}-search" placeholder="Search records"></label><p class="error" id="${prefix}-error" role="alert"></p><div class="table-wrap"><table><thead><tr><th>ID</th>${section.fields.map(f=>`<th>${f.label}</th>`).join('')}<th></th></tr></thead><tbody id="${prefix}-rows"></tbody></table></div></section>`);
+    $('#admin').insertAdjacentHTML('beforeend',`<section id="${prefix}-page" role="tabpanel" hidden><div class="toolbar"><p>Farestald · ${section.title}</p><div>${section.key==='medicine-sow'?'<a class="pwa-install-link" href="/farestald-injections/?install=1" style="display:inline-flex;align-items:center;border-radius:9px;padding:11px 18px;background:#286445;color:#fff;font-weight:700;text-decoration:none">Install Farestald Injections</a>':''}${section.key==='done-sow-injections'?'<input id="farestald-report-date" type="date" aria-label="Report start date"><button class="secondary" id="farestald-report-print">Print week</button><button class="secondary" id="farestald-report-xlsx">XLSX</button>':''}<button id="${prefix}-add">+ Add record</button></div></div><label>Search<input type="search" id="${prefix}-search" placeholder="Search records"></label><p class="error" id="${prefix}-error" role="alert"></p><div class="table-wrap"><table><thead><tr><th>ID</th>${section.fields.map(f=>`<th>${f.label}</th>`).join('')}<th></th></tr></thead><tbody id="${prefix}-rows"></tbody></table></div></section>`);
     $(`#${prefix}-add`).onclick = () => open(section);
     $(`#${prefix}-search`).oninput = () => render(section);
   }
+  $('#farestald-report-date').value = new Date().toISOString().slice(0,10);
+  async function reportFile(kind) {
+    const date = $('#farestald-report-date').value || new Date().toISOString().slice(0,10);
+    const error = $('#farestald-done-sow-injections-error');
+    const preview = kind === '-print' ? window.open('', '_blank') : null;
+    error.textContent = '';
+    try {
+      const response = await fetch('/api/farestald/done-sow-injections/week-report' + kind + '?start_date=' + encodeURIComponent(date), {headers:{Authorization:'Bearer ' + getToken()}});
+      if (!response.ok) {
+        const detail = await response.json().catch(()=>({}));
+        throw new Error(detail.error || 'Report generation failed (' + response.status + ')');
+      }
+      const url = URL.createObjectURL(await response.blob());
+      if (kind === '-print') {
+        if (preview) preview.location.href = url;
+        else { URL.revokeObjectURL(url); throw new Error('Allow pop-ups to open the print report.'); }
+      } else {
+        const link = document.createElement('a');
+        link.href = url; link.download = 'farestald-done-sow-' + date + '.xlsx'; link.click();
+      }
+      setTimeout(()=>URL.revokeObjectURL(url),60000);
+    } catch (e) { if (preview) preview.close(); error.textContent = e.message; }
+  }
+  $('#farestald-report-print').onclick = ()=>reportFile('-print');
+  $('#farestald-report-xlsx').onclick = ()=>reportFile('.xlsx');
   document.body.insertAdjacentHTML('beforeend','<dialog id="farestald-dialog"><form id="farestald-form"><h2 id="farestald-title"></h2><div id="farestald-fields"></div><p id="farestald-form-error" class="error" role="alert"></p><div class="actions"><button type="button" class="secondary" id="farestald-cancel">Cancel</button><button type="submit">Save</button></div></form></dialog>');
   const farrowings=setupFarrowings({api,getUser,reload:()=>load(sections.find(s=>s.key==='done-sow-injections'))});
   let editing;

@@ -1,4 +1,5 @@
 import express from 'express';
+import { createSowReportsRouter } from './sow-reports.js';
 import { requireAuth, requireAdmin } from './auth.js';
 import { createFarestaldMobileRouter } from './farestald-mobile.js';
 import { createFarrowingsRouter } from './farestald-farrowings.js';
@@ -42,6 +43,7 @@ export function validateFarestald(resource, body = {}) {
 export function createFarestaldRouter(pool) {
   const router = express.Router();
   router.use(requireAuth);
+  router.use('/done-sow-injections', createSowReportsRouter(pool, 'farestald'));
   router.use('/mobile', createFarestaldMobileRouter(pool, validateFarestald));
   router.use('/farrowings', createFarrowingsRouter(pool, validateFarestald));
   const pens = `SELECT p.id,p.name,r.name AS room_name,d.name AS department_name FROM pens p JOIN rooms r ON r.id=p.room_id JOIN departments d ON d.id=r.department_id WHERE lower(trim(d.name))='farestald'`;
