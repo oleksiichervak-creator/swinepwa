@@ -33,6 +33,13 @@ docker compose up --build
 - Stock and injections reference only the Farestald medicine table. Users and farm location directories are shared; injection forms and API accept only pens belonging to the Farestald department (`GET /api/farestald/pens`). Create its rooms and pens under Farm if needed.
 - Signed-in users can view; administrators can create, edit and delete. The existing Injections phone app remains attached to Lobe/Dragte.
 
+### Farestald farrowing medication registration
+
+- In **Farestald → Sow injections → Done sow injections**, administrators can use **reg farowings med** to paste 1–40 sow numbers from Excel and select one common Farestald pen and a date.
+- Select one Farestald medicine for `Milk deficiency (OX)` and one for `Pain (M)` (spacing and case are normalized). Doses use the existing medicine ratio at 250 kg, once per medicine per sow; no course or planned records are created.
+- The form previews the count and doses. Duplicate numbers, invalid doses, missing medicines and non-Farestald pens are rejected. The signed-in administrator is recorded as the performer.
+- `/api/farestald/farrowings/options` and `/api/farestald/farrowings/register` are administrator-only. All entries are committed together; `farestald_farrowing_batches` stores request IDs to prevent duplicates on retries of the same batch.
+
 ### Farestald Injections phone app
 
 - Install from **Farestald → Medicine → Medicine Sow → Install Farestald Injections**, or open `/farestald-injections/?install=1`.

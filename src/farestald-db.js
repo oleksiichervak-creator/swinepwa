@@ -1,4 +1,10 @@
 export async function initializeFarestald(pool) {
+  await pool.query(`CREATE TABLE IF NOT EXISTS farestald_farrowing_batches (
+    id UUID PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    payload JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`);
   await pool.query(`
 CREATE TABLE IF NOT EXISTS farestald_medicine_sow (
       id BIGSERIAL PRIMARY KEY,
