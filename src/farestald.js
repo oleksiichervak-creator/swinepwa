@@ -42,7 +42,7 @@ export function createFarestaldRouter(pool) {
   const router = express.Router();
   router.use(requireAuth);
   router.use('/mobile', createFarestaldMobileRouter(pool, validateFarestald));
-  const pens = `SELECT p.id,p.name,r.name AS room_name FROM pens p JOIN rooms r ON r.id=p.room_id JOIN departments d ON d.id=r.department_id WHERE lower(trim(d.name))='farestald'`;
+  const pens = `SELECT p.id,p.name,r.name AS room_name,d.name AS department_name FROM pens p JOIN rooms r ON r.id=p.room_id JOIN departments d ON d.id=r.department_id WHERE lower(trim(d.name))='farestald'`;
   router.get('/pens', async (_req,res,next) => {
     try { res.json((await pool.query(pens + ' ORDER BY r.name,p.name')).rows); } catch (e) { next(e); }
   });

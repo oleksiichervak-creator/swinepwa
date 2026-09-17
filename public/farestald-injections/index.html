@@ -1,34 +1,172 @@
 <!doctype html>
-<html lang="en"><head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#245c43"><meta name="description" content="Plan and register Farestald sow injections">
-  <link rel="manifest" href="/farestald-injections/manifest.json"><link rel="icon" href="/farestald-injections/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/farestald-injections/styles.css"><title>Farestald Injections</title>
-</head><body><main>
-  <section id="login-view" class="view login-view">
-    <div class="brand">FI</div><p class="eyebrow">FARESTALD</p><h1>Farestald Injections</h1><p class="intro">Plan and register treatments in Farestald.</p>
-    <form id="login-form" class="panel"><label>User<select id="login-user" required><option value="">Loading users...</option></select></label><label>Password<input id="login-password" type="password" inputmode="numeric" autocomplete="current-password" required></label><p id="login-error" class="error" role="alert"></p><button type="submit">Sign in</button></form>
-  </section>
-  <section id="app-view" class="view" hidden>
-    <header><button id="back" type="button" class="icon-button" aria-label="Back" hidden>&larr;</button><div><h1 id="title">Farestald</h1></div><button id="logout" type="button" class="text-button">Sign out</button></header>
-    <section id="home-screen" class="screen"><p class="welcome">Signed in as <strong id="current-user"></strong></p><div class="choice-grid">
-      <button id="show-add" type="button" class="choice-card"><span class="choice-icon">+</span><span><strong>Add injection</strong><small>Plan a Farestald treatment</small></span></button>
-      <button id="show-today" type="button" class="choice-card accent"><span class="choice-count">FI</span><span><strong>Injections for today</strong><small>Register completed injections</small></span></button>
-    </div></section>
-    <section id="add-screen" class="screen" hidden><form id="add-form" class="panel form-panel">
-      <label>Sow number<input name="sow_number" maxlength="100" required inputmode="numeric" autocomplete="off"></label>
-      <label>Pen<select name="pen_id" required></select></label>
-      <label>Medicine<select name="medicine_sow_id" required></select></label>
-      <label>Weight (kg)<select name="weight_kg" required></select></label>
-      <label>Start date<input name="injection_date" type="date" required></label>
-      <div id="dose-preview" class="medicine" aria-live="polite"></div>
-      <label>Comment<textarea name="comment" rows="3" maxlength="4000"></textarea></label>
-      <p id="add-error" class="error" role="alert"></p><button id="save-plan" type="submit">Add injection</button>
-    </form></section>
-    <section id="today-screen" class="screen" hidden><div class="date-row"><p id="today-date" class="welcome"></p><button id="refresh" type="button" class="secondary">Refresh</button></div><p id="today-error" class="error" role="alert"></p><div id="today-list" class="injection-list" aria-live="polite"></div></section>
-  </section>
-</main>
-<dialog id="complete-dialog"><form id="complete-form"><button id="complete-close" class="dialog-close" type="button" aria-label="Close">&times;</button><p class="eyebrow">FARESTALD</p><h2>Register injection</h2><dl id="complete-details"></dl><input name="id" type="hidden"><label>Completed on<input name="injection_date" type="date" required></label><label>Dose (ml)<input name="dose_ml" type="number" min="0" step="0.001" required inputmode="decimal"></label><label>Comment<textarea name="comment" rows="3" maxlength="4000"></textarea></label><p id="complete-error" class="error" role="alert"></p><button type="submit">Confirm injection</button></form></dialog>
-<dialog id="install-dialog"><form method="dialog"><p class="eyebrow">FARESTALD</p><h2>Install Farestald Injections</h2><p id="install-message">Install this app for quick access.</p><button type="button" id="install">Install app</button><button type="submit" class="secondary">Not now</button></form></dialog>
-<div id="toast" class="toast" role="status" aria-live="polite"></div>
-<script type="module" src="/farestald-injections/app.js"></script></body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#245c43">
+  <meta name="description" content="Plan and register sow injections">
+  <link rel="manifest" href="/farestald-injections/manifest.json">
+  <link rel="icon" href="/farestald-injections/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/farestald-injections/styles.css?v=2">
+  <style>.sow-info-icon{background:#e3e8f5;color:#334f8f;font-size:25px;font-weight:950}.info-search{margin-bottom:14px}.info-search label{margin-bottom:12px}.sow-info-heading{display:grid;grid-template-columns:1fr auto;align-items:end;padding:4px 3px}.sow-info-heading span,.sow-info-heading small{color:#64766b;font-size:12px;font-weight:750}.sow-info-heading strong{grid-row:2;font-size:24px}.sow-info-heading small{grid-column:2;grid-row:2}.info-details{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.info-details div{display:grid;gap:2px;padding:9px;border-radius:10px;background:#eef5f0}.info-details span{color:#64766b;font-size:10px;font-weight:750;text-transform:uppercase}.info-details strong{font-size:13px}.info-comment{margin:10px 0 0;padding:9px 11px;border-left:3px solid #9bb7a5;background:#f6f9f7;color:#52675b;font-size:12px}</style>
+  <style>.user-picker{min-width:0;margin:0 0 18px;padding:0;border:0}.user-picker legend{margin-bottom:9px;color:#33483c;font-size:13px;font-weight:750}.user-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.user-button{display:grid;justify-items:center;gap:7px;min-width:0;padding:11px 5px;border:2px solid transparent;border-radius:15px;background:#eef4f0;color:#294838}.user-button span{display:grid;place-items:center;width:48px;height:48px;border-radius:50%;background:#d3e4d8;color:#245c43;font-size:17px;font-weight:900}.user-button strong{max-width:100%;overflow:hidden;text-overflow:ellipsis;font-size:12px}.user-button.selected{border-color:#245c43;background:#fff;box-shadow:0 5px 15px #245c4320}.user-button.selected span{background:#245c43;color:#fff}.today-injection-card{border-left:6px solid #245c43}.today-injection-card header{align-items:center}.pen-label{display:block;color:#6b7c72;font-size:10px;font-weight:900;letter-spacing:.14em}.today-injection-card .pen-number{font-size:38px;line-height:1;color:#173f2e}.sow-number{padding:7px 9px;border-radius:9px;background:#eef5f0;font-size:13px}</style>
+  <title>Farestald Injections</title>
+</head>
+<body>
+  <main>
+    <section id="login-view" class="view login-view">
+      <div class="brand" aria-hidden="true">FI</div>
+      <p class="eyebrow">FARESTALD</p>
+      <h1>Farestald Injections</h1>
+      <p class="intro">Sign in to plan and register treatments.</p>
+      <form id="login-form" class="panel">
+        <fieldset class="user-picker"><legend>Choose user</legend><div id="login-users" class="user-grid"><span>Loading users…</span></div></fieldset>
+        <input id="login-user" type="hidden">
+        <label>Password
+          <input id="login-password" class="pin-display" type="password" required readonly inputmode="none" autocomplete="off" aria-label="Numeric password">
+        </label>
+        <div id="pin-keypad" class="pin-keypad" aria-label="Numeric password keypad">
+          <button type="button" data-pin="1">1</button><button type="button" data-pin="2">2</button><button type="button" data-pin="3">3</button>
+          <button type="button" data-pin="4">4</button><button type="button" data-pin="5">5</button><button type="button" data-pin="6">6</button>
+          <button type="button" data-pin="7">7</button><button type="button" data-pin="8">8</button><button type="button" data-pin="9">9</button>
+          <button type="button" class="pin-action" data-pin-clear aria-label="Clear password">Clear</button><button type="button" data-pin="0">0</button><button type="button" class="pin-action" data-pin-backspace aria-label="Delete last digit">&#9003;</button>
+        </div>
+        <p id="login-error" class="error" role="alert"></p>
+        <button type="submit">Sign in</button>
+      </form>
+    </section>
+
+    <section id="app-view" class="view" hidden>
+      <header>
+        <button id="back-button" class="icon-button" type="button" aria-label="Back" hidden>←</button>
+        <div>
+          <h1 id="screen-title"></h1>
+        </div>
+        <button id="logout-button" class="text-button" type="button">Sign out</button>
+      </header>
+
+      <section id="home-screen" class="screen">
+        <p class="welcome">Signed in as <strong id="current-user"></strong></p>
+        <div class="choice-grid">
+          <button id="show-plan" class="choice-card" type="button">
+            <span class="choice-icon">＋</span>
+            <span><strong>Add injection</strong><small>Schedule a new sow injection</small></span>
+          </button>
+          <button id="show-today" class="choice-card accent" type="button">
+            <span class="choice-icon today-icon" aria-hidden="true">&#128137;</span>
+            <span><strong>Injections for today</strong><small>Register completed injections</small></span>
+          </button>
+        </div>
+      </section>
+
+      <section id="plan-screen" class="screen" hidden>
+        <form id="plan-form" class="panel form-panel">
+          <div class="step active" data-step="1">
+            <div class="step-heading"><span>1</span><strong>Sow number</strong></div>
+            <label>
+              <input name="sow_number" required maxlength="100" inputmode="numeric" autocomplete="off" placeholder="Enter sow number">
+            </label>
+            <p id="sow-check-status" class="check-status"></p>
+            <div id="sow-history" class="history" hidden></div>
+          </div>
+
+          <div class="step" data-step="2" hidden>
+            <div class="step-heading"><span>2</span><strong>Pen</strong></div>
+            <label>
+              <input id="pen-input" list="pen-options" inputmode="decimal" pattern="[0-9]+([.,][0-9]+)?" autocomplete="off" placeholder="Enter pen number">
+              <datalist id="pen-options"></datalist>
+              <input name="pen_id" type="hidden">
+            </label>
+            <p id="pen-result" class="selection-result"></p>
+          </div>
+
+          <div class="step" data-step="3" hidden>
+            <div class="step-heading"><span>3</span><strong>Medicine</strong></div>
+            <label>
+              <select name="medicine_sow_id" required>
+                <option value="">Select medicine</option>
+              </select>
+            </label>
+            <div id="recent-medicine-warning" class="medicine-warning" role="alert" hidden></div>
+          </div>
+
+          <div class="step" data-step="4" hidden>
+            <div class="step-heading"><span>4</span><strong>Weight</strong></div>
+            <input name="weight_kg" type="hidden">
+            <div id="weight-grid" class="weight-grid" role="group" aria-label="Select weight"></div>
+          </div>
+
+          <div class="step" data-step="5" hidden>
+            <div class="step-heading"><span>5</span><strong>Review</strong></div>
+            <div id="dose-preview" class="dose-preview"></div>
+            <label id="melovem-option" class="check-option" hidden>
+              <input name="include_melovem" type="checkbox" checked>
+              <span><strong>Add Melovem</strong><small>Pain relief given together with this medicine</small></span>
+            </label>
+            <div id="melovem-schedule" hidden>
+              <button id="add-melovem-days" class="step-button" type="button" aria-expanded="false">Add more days</button>
+              <div id="melovem-calendar" class="melovem-calendar" hidden></div>
+            </div>
+            <label>Date
+              <input name="injection_date" type="date" required>
+            </label>
+            <label>Comment
+              <textarea name="comment" rows="3"></textarea>
+            </label>
+            <button type="submit">Add injection</button>
+          </div>
+          <p id="plan-error" class="error" role="alert"></p>
+        </form>
+      </section>
+
+      <section id="today-screen" class="screen" hidden>
+        <p id="today-date-label" class="today-date-label"></p>
+        <div id="medicine-summary" class="medicine-summary" aria-live="polite"></div>
+        <div id="today-list" class="injection-list" aria-live="polite"></div>
+      </section>
+
+
+
+
+
+    </section>
+  </main>
+
+
+  <dialog id="complete-dialog">
+    <form id="complete-form">
+      <button id="complete-close" class="dialog-close" type="button" aria-label="Close">×</button>
+      <p class="eyebrow">REGISTER INJECTION</p>
+      <h2 id="complete-title"></h2>
+      <dl id="complete-details"></dl>
+      <input name="id" type="hidden">
+      <label>Completed on
+        <input name="injection_date" type="date" required>
+      </label>
+      <label>Dose (ml)
+        <input name="dose_ml" type="number" min="0" step="0.001" required inputmode="decimal">
+      </label>
+      <label>Comment
+        <textarea name="comment" rows="3"></textarea>
+      </label>
+      <p id="complete-error" class="error" role="alert"></p>
+      <button type="submit">Confirm injection</button>
+    </form>
+  </dialog>
+
+  <dialog id="install-dialog">
+    <form method="dialog">
+      <p class="eyebrow">SOW INJECTIONS</p>
+      <h2>Install Farestald Injections</h2>
+      <p id="install-message">Install the app on this device for quick access.</p>
+      <div class="install-actions">
+        <button id="install-app" type="button">Install app</button>
+        <button id="install-dismiss" class="secondary" type="button">Not now</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="/farestald-injections/app.js?v=2" type="module"></script>
+</body>
+</html>

@@ -1,77 +1,561 @@
-const $=selector=>document.querySelector(selector);
-const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const today=()=>{const date=new Date();return new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,10);};
-let token=localStorage.getItem('farestald-injections-token')||'';
-let user=null,medicines=[],todayItems=[],installPrompt=null;
-async function api(path,options={}) {
-  const response=await fetch('/api'+path,{...options,headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})}});
-  if(response.status===401&&token){signOut();throw new Error('Please sign in again.');}
-  if(!response.ok){const body=await response.json().catch(()=>({}));throw new Error(body.error||'Request failed');}
-  return response.status===204?null:response.json();
-}
-function screen(name){for(const id of ['home','add','today'])$(`#${id}-screen`).hidden=id!==name;$('#back').hidden=name==='home';$('#title').textContent=name==='home'?'Farestald':name==='add'?'Add injection':'Injections for today';}
-function enter(){ $('#login-view').hidden=true;$('#app-view').hidden=false;$('#current-user').textContent=user.username;screen('home'); }
-function signOut(){token='';user=null;medicines=[];todayItems=[];localStorage.removeItem('farestald-injections-token');$('#app-view').hidden=true;$('#login-view').hidden=false;$('#complete-dialog').close();$('#add-form').reset();$('#today-list').innerHTML='';}
-function toast(message){$('#toast').textContent=message;$('#toast').classList.add('show');setTimeout(()=>$('#toast').classList.remove('show'),3000);}
-async function loadUsers(){
-  try{const users=await api('/auth/users');$('#login-user').innerHTML='<option value="">Choose user</option>'+users.map(x=>`<option value="${escape(x.username)}">${escape(x.username)}</option>`).join('');}
-  catch(error){$('#login-error').textContent=error.message;}
-}
-$('#login-form').onsubmit=async event=>{
-  event.preventDefault();const button=event.currentTarget.querySelector('button');button.disabled=true;$('#login-error').textContent='';
-  try{const result=await api('/auth/login',{method:'POST',body:JSON.stringify({username:$('#login-user').value,password:$('#login-password').value})});token=result.token;user=result.user;localStorage.setItem('farestald-injections-token',token);$('#login-password').value='';enter();}
-  catch(error){$('#login-error').textContent=error.message;}finally{button.disabled=false;}
-};
-$('#logout').onclick=signOut;$('#back').onclick=()=>screen('home');
-$('#show-add').onclick=async()=>{
-  screen('add');const form=$('#add-form');form.reset();form.elements.injection_date.value=today();$('#add-error').textContent='';$('#dose-preview').textContent='';$('#save-plan').disabled=true;medicines=[];
-  form.elements.pen_id.innerHTML='<option value="">Loading pens...</option>';form.elements.medicine_sow_id.innerHTML='<option value="">Loading medicines...</option>';
-  form.elements.weight_kg.innerHTML='<option value="">Select weight</option>'+Array.from({length:18},(_,i)=>75+i*25).map(weight=>`<option value="${weight}">${weight} kg</option>`).join('');
-  try{
-    const [pens,items]=await Promise.all([api('/farestald/pens'),api('/farestald/medicine-sow')]);medicines=items;
-    form.elements.pen_id.innerHTML='<option value="">Select pen</option>'+pens.map(p=>`<option value="${p.id}">${escape(p.room_name)} / ${escape(p.name)}</option>`).join('');
-    form.elements.medicine_sow_id.innerHTML='<option value="">Select medicine</option>'+items.map(m=>`<option value="${m.id}">${escape(m.name)}</option>`).join('');
-    if(!pens.length||!items.length)throw new Error('Add Farestald pens and medicines on the website first.');
-    $('#save-plan').disabled=false;
-  }catch(error){$('#add-error').textContent=error.message;}
-};
-function preview(){const form=$('#add-form'),medicine=medicines.find(m=>String(m.id)===form.elements.medicine_sow_id.value),weight=Number(form.elements.weight_kg.value);$('#dose-preview').textContent=medicine?`Diagnosis: ${medicine.diagnosis}. ${weight&&Number(medicine.dose_kg)>0?`Dose: ${(weight*Number(medicine.dose_ml)/Number(medicine.dose_kg)).toFixed(3)} ml. `:''}Course: ${Math.max(1,Number(medicine.course_days))} day(s), one injection per day.`:'';}
-$('#add-form').elements.medicine_sow_id.onchange=preview;$('#add-form').elements.weight_kg.onchange=preview;
-$('#add-form').onsubmit=async event=>{
-  event.preventDefault();$('#save-plan').disabled=true;$('#add-error').textContent='';
-  try{const result=await api('/farestald/mobile/plans',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(event.currentTarget)))});toast(`${result.plans.length} injection(s) added to the plan`);screen('home');}
-  catch(error){$('#add-error').textContent=error.message;}finally{$('#save-plan').disabled=false;}
-};
-async function loadToday(){
-  const date=today();$('#today-date').textContent=date;$('#today-error').textContent='';$('#today-list').innerHTML='<p class="empty">Loading injections...</p>';$('#refresh').disabled=true;todayItems=[];
-  try{
-    todayItems=await api('/farestald/mobile/today?date='+date);
-    $('#today-list').innerHTML=todayItems.length?todayItems.map(item=>`<article class="injection-card"><header><h2>Pen ${escape(item.pen_name)}</h2><strong>Sow ${escape(item.sow_number)}</strong></header><div class="medicine">${escape(item.medicine_name)} &middot; ${escape(item.dose_ml)} ml</div><div class="meta"><span>${escape(item.room_name)}</span><span>${escape(item.weight_kg??'')} kg</span></div><p>${escape(item.diagnosis)}</p>${item.comment?`<p>${escape(item.comment)}</p>`:''}<button class="complete-button" data-id="${item.id}">Register injection</button></article>`).join(''):'<p class="empty">No planned injections for today.</p>';
-    document.querySelectorAll('[data-id]').forEach(button=>button.onclick=()=>openComplete(todayItems.find(x=>String(x.id)===button.dataset.id)));
-  }catch(error){$('#today-list').innerHTML='';$('#today-error').textContent=error.message;}
-  finally{$('#refresh').disabled=false;}
-}
-$('#show-today').onclick=()=>{screen('today');loadToday();};$('#refresh').onclick=loadToday;
-function openComplete(item){
-  const form=$('#complete-form');form.reset();form.elements.id.value=item.id;form.elements.injection_date.value=today();form.elements.dose_ml.value=item.dose_ml;form.elements.comment.value=item.comment||'';
-  $('#complete-details').innerHTML=`<dt>Sow</dt><dd>${escape(item.sow_number)}</dd><dt>Pen</dt><dd>${escape(item.pen_name)}</dd><dt>Medicine</dt><dd>${escape(item.medicine_name)}</dd><dt>Diagnosis</dt><dd>${escape(item.diagnosis)}</dd>`;
-  $('#complete-error').textContent='';$('#complete-dialog').showModal();
-}
-$('#complete-close').onclick=()=>$('#complete-dialog').close();
-$('#complete-form').onsubmit=async event=>{
-  event.preventDefault();const form=event.currentTarget,button=form.querySelector('[type="submit"]');button.disabled=true;$('#complete-error').textContent='';
-  try{const {id,...data}=Object.fromEntries(new FormData(form));await api(`/farestald/mobile/plans/${id}/complete`,{method:'POST',body:JSON.stringify(data)});$('#complete-dialog').close();toast('Injection registered');await loadToday();}
-  catch(error){$('#complete-error').textContent=error.message;}finally{button.disabled=false;}
+const $ = selector => document.querySelector(selector);
+const localDate = () => {
+  const now = new Date();
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 };
 
-const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
-const installRequested=new URLSearchParams(location.search).get('install')==='1';
-function installationHelp(){return /iPad|iPhone|iPod/.test(navigator.userAgent)?'In Safari, tap Share, then Add to Home Screen.':'Open the browser menu and select Install app or Add to Home screen.';}
-function showInstall(){if(installRequested&&!standalone&&!$('#install-dialog').open){$('#install-message').textContent=installPrompt?'Install Farestald Injections on this device.':installationHelp();$('#install-dialog').showModal();}}
-window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;showInstall();});
-$('#install').onclick=async()=>{if(!installPrompt){$('#install-message').textContent=installationHelp();return;}await installPrompt.prompt();installPrompt=null;$('#install-dialog').close();};
-window.addEventListener('appinstalled',()=>$('#install-dialog').close());
-if('serviceWorker' in navigator)navigator.serviceWorker.register('/farestald-injections/sw.js',{scope:'/farestald-injections/',updateViaCache:'none'}).then(r=>r.update()).catch(()=>{});
-loadUsers();
-if(token){try{user=await api('/auth/me');enter();}catch(error){signOut();$('#login-error').textContent=error.message;}}
-showInstall();
+let token = localStorage.getItem('farestald-injections-token') || '';
+let currentUser = null;
+let todayItems = [];
+let references = null;
+let sowHistoryItems = [];
+let installPrompt = null;
+
+async function api(path, options = {}) {
+  const response = await fetch(path, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
+  });
+  if (response.status === 401 && token) {
+    signOut();
+    throw new Error('Your session has expired. Please sign in again.');
+  }
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.error || `Request failed (${response.status})`);
+  }
+  return response.status === 204 ? null : response.json();
+}
+
+async function loadUsers() {
+  const grid = $('#login-users');
+  try {
+    const users = await api('/api/auth/users');
+    grid.innerHTML = users.length
+      ? users.map(user => `<button class="user-button" type="button" data-username="${escapeHtml(user.username)}"><span>${escapeHtml(userInitials(user.username))}</span><strong>${escapeHtml(user.username)}</strong></button>`).join('')
+      : '<span>No users available</span>';
+    grid.querySelectorAll('.user-button').forEach(button => button.addEventListener('click', () => selectLoginUser(button)));
+    if (users.length) selectLoginUser(grid.querySelector('.user-button'));
+  } catch (error) {
+    grid.innerHTML = '<span>Unable to load users</span>';
+    $('#login-error').textContent = error.message;
+  }
+}
+
+function selectLoginUser(button) {
+  $('#login-user').value = button.dataset.username;
+  document.querySelectorAll('.user-button').forEach(item => item.classList.toggle('selected', item === button));
+  $('#login-password').value = '';
+  $('#login-error').textContent = '';
+}
+
+function userInitials(username) {
+  const parts = String(username).trim().split(/\s+/).filter(Boolean);
+  return (parts.length > 1 ? parts[0][0] + parts.at(-1)[0] : parts[0]?.slice(0, 2) || '?').toUpperCase();
+}
+
+$('#login-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const button = event.submitter;
+  button.disabled = true;
+  $('#login-error').textContent = '';
+  try {
+    const result = await api('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ username: $('#login-user').value, password: $('#login-password').value }),
+    });
+    token = result.token;
+    currentUser = result.user;
+    localStorage.setItem('farestald-injections-token', token);
+    $('#login-password').value = '';
+    await enterApp();
+  } catch (error) {
+    $('#login-error').textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+});
+
+async function restoreSession() {
+  if (!token) return loadUsers();
+  try {
+    currentUser = await api('/api/auth/me');
+    await enterApp();
+  } catch {
+    await loadUsers();
+  }
+}
+
+async function enterApp() {
+  $('#login-view').hidden = true;
+  $('#app-view').hidden = false;
+  $('#current-user').textContent = currentUser.username;
+  setTodayDateLabel();
+  showScreen('home');
+}
+
+function signOut() {
+  token = '';
+  currentUser = null;
+  references = null;
+  localStorage.removeItem('farestald-injections-token');
+  $('#app-view').hidden = true;
+  $('#login-view').hidden = false;
+  loadUsers();
+}
+
+function showScreen(name) {
+  for (const screen of ['home', 'plan', 'today']) $(`#${screen}-screen`).hidden = screen !== name;
+  $('#back-button').hidden = name === 'home';
+  $('#screen-title').textContent = '';
+  $('#logout-button').hidden = name !== 'home';
+}
+
+function setTodayDateLabel() {
+  $('#today-date-label').textContent = new Intl.DateTimeFormat('en-GB', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  }).format(new Date());
+}
+
+async function loadReferences() {
+  if (references) return references;
+  const [pens, medicines] = await Promise.all([api('/api/farestald/pens'), api('/api/farestald/medicine-sow')]);
+  references = { pens, medicines };
+  return references;
+}
+
+$('#show-plan').addEventListener('click', async () => {
+  showScreen('plan');
+  $('#plan-error').textContent = '';
+  try {
+    await preparePlanForm();
+  } catch (error) {
+    $('#plan-error').textContent = error.message;
+  }
+});
+
+async function preparePlanForm() {
+  const { pens, medicines } = await loadReferences();
+  const form = $('#plan-form');
+  form.reset();
+  form.pen_id.value = '';
+  form.injection_date.value = localDate();
+  form.medicine_sow_id.innerHTML = '<option value="">Select medicine</option>' +
+    medicines.map(m => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
+  form.weight_kg.value = '';
+  $('#melovem-schedule').hidden = true;
+  $('#melovem-calendar').hidden = true;
+  $('#melovem-calendar').dataset.baseDate = '';
+  $('#add-melovem-days').setAttribute('aria-expanded', 'false');
+  $('#weight-grid').innerHTML = Array.from({ length: 14 }, (_, index) => 75 + index * 25)
+    .map(weight => `<button class="weight-button" type="button" data-weight="${weight}">${weight}<small>kg</small></button>`).join('');
+  document.querySelectorAll('[data-weight]').forEach(button => button.addEventListener('click', () => selectWeight(button)));
+  $('#pen-options').innerHTML = pens.map(p =>
+    `<option value="${escapeHtml(p.name)}">${escapeHtml(p.department_name)} / ${escapeHtml(p.room_name)}</option>`).join('');
+  $('#pen-input').value = '';
+  $('#pen-result').textContent = '';
+  $('#sow-check-status').textContent = '';
+  $('#sow-history').hidden = true;
+  $('#sow-history').innerHTML = '';
+  sowHistoryItems = [];
+  $('#recent-medicine-warning').hidden = true;
+  for (const step of document.querySelectorAll('.step')) step.hidden = step.dataset.step !== '1';
+}
+
+function revealStep(number) {
+  const step = document.querySelector(`.step[data-step="${number}"]`);
+  step.hidden = false;
+  requestAnimationFrame(() => step.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+}
+
+function hideStepsFrom(number) {
+  for (const step of document.querySelectorAll('.step')) {
+    if (Number(step.dataset.step) >= number) step.hidden = true;
+  }
+}
+
+let sowCheckTimer;
+let sowCheckSequence = 0;
+$('#plan-form').sow_number.addEventListener('input', () => {
+  clearTimeout(sowCheckTimer);
+  hideStepsFrom(2);
+  $('#sow-history').hidden = true;
+  sowHistoryItems = [];
+  $('#recent-medicine-warning').hidden = true;
+  $('#sow-check-status').textContent = '';
+  const sowNumber = $('#plan-form').sow_number.value.trim();
+  if (!sowNumber) return;
+  $('#sow-check-status').textContent = 'Checking history…';
+  sowCheckTimer = setTimeout(() => checkSowHistory(sowNumber), 450);
+});
+
+async function checkSowHistory(sowNumber) {
+  const history = $('#sow-history');
+  const sequence = ++sowCheckSequence;
+  $('#plan-error').textContent = '';
+  try {
+    const items = await api(`/api/farestald/mobile/history?sow_number=${encodeURIComponent(sowNumber)}`);
+    if (sequence !== sowCheckSequence || $('#plan-form').sow_number.value.trim() !== sowNumber) return;
+    $('#sow-check-status').textContent = 'History checked';
+    sowHistoryItems = items;
+    history.hidden = false;
+    history.innerHTML = items.length
+      ? `<strong>${items.length} existing record${items.length === 1 ? '' : 's'}</strong>` + items.map(item => `
+          <div class="history-row">
+            <span class="status ${item.status}">${item.status}</span>
+            <span>${escapeHtml(item.injection_date)}</span>
+            <span>${escapeHtml(item.medicine_name)} · ${item.dose_ml} ml</span>
+          </div>`).join('')
+      : '<strong>No planned or completed injections found.</strong>';
+    revealStep(2);
+  } catch (error) {
+    $('#sow-check-status').textContent = '';
+    $('#plan-error').textContent = error.message;
+  }
+}
+
+let penCheckTimer;
+$('#pen-input').addEventListener('input', () => {
+  const input = $('#pen-input');
+  const normalized = input.value.replace(',', '.').replace(/[^0-9.]/g, '');
+  const [whole, ...decimals] = normalized.split('.');
+  input.value = decimals.length ? `${whole}.${decimals.join('')}` : whole;
+  clearTimeout(penCheckTimer);
+  $('#plan-form').pen_id.value = '';
+  $('#pen-result').textContent = 'Checking pen…';
+  $('#pen-result').classList.remove('invalid');
+  hideStepsFrom(3);
+  penCheckTimer = setTimeout(validatePenInput, 250);
+});
+
+async function validatePenInput() {
+  const value = $('#pen-input').value.trim().replace(',', '.').toLocaleLowerCase();
+  if (!value) {
+    $('#pen-result').textContent = '';
+    return;
+  }
+  const { pens } = await loadReferences();
+  const matches = pens.filter(p => p.name.trim().toLocaleLowerCase() === value);
+  $('#plan-form').pen_id.value = '';
+  if (!matches.length) {
+    $('#pen-result').textContent = 'Pen not found. Check the number and try again.';
+    $('#pen-result').classList.add('invalid');
+    return;
+  }
+  if (matches.length > 1) {
+    $('#pen-result').textContent = 'More than one pen has this number. Ask an administrator to make pen numbers unique.';
+    $('#pen-result').classList.add('invalid');
+    return;
+  }
+  const pen = matches[0];
+  $('#plan-form').pen_id.value = pen.id;
+  $('#pen-result').textContent = `Found: ${pen.department_name} / ${pen.room_name} / ${pen.name}`;
+  $('#pen-result').classList.remove('invalid');
+  revealStep(3);
+}
+
+$('#plan-form').medicine_sow_id.addEventListener('change', event => {
+  document.querySelector('.step[data-step="5"]').hidden = true;
+  updateRecentMedicineWarning();
+  if (event.target.value) {
+    $('#melovem-calendar').dataset.baseDate = '';
+    revealStep(4);
+  }
+});
+
+function selectWeight(button) {
+  document.querySelectorAll('[data-weight]').forEach(item => item.classList.toggle('selected', item === button));
+  $('#plan-form').weight_kg.value = button.dataset.weight;
+  updateDosePreview();
+  revealStep(5);
+}
+
+$('#plan-form').include_melovem.addEventListener('change', updateDosePreview);
+$('#plan-form').injection_date.addEventListener('change', () => {
+  $('#melovem-calendar').dataset.baseDate = '';
+  updateRecentMedicineWarning();
+  updateDosePreview();
+});
+$('#add-melovem-days').addEventListener('click', () => {
+  const calendar = $('#melovem-calendar');
+  calendar.hidden = !calendar.hidden;
+  $('#add-melovem-days').setAttribute('aria-expanded', String(!calendar.hidden));
+});
+$('#melovem-calendar').addEventListener('change', updateDosePreview);
+
+function updateDosePreview() {
+  const form = $('#plan-form');
+  const medicine = references.medicines.find(item => String(item.id) === form.medicine_sow_id.value);
+  const melovem = references.medicines.find(item => item.name.trim().toLocaleLowerCase() === 'melovem');
+  const weight = Number(form.weight_kg.value);
+  if (!medicine || !weight) return;
+  const dose = calculateDose(medicine, weight);
+  const selectedMelovem = medicine.name.trim().toLocaleLowerCase() === 'melovem';
+  const offerMelovem = !selectedMelovem;
+  $('#melovem-option').hidden = !offerMelovem;
+  const includeMelovem = offerMelovem && form.include_melovem.checked && melovem;
+  const planMelovem = selectedMelovem || includeMelovem;
+  $('#melovem-schedule').hidden = !planMelovem;
+  if (planMelovem) renderMelovemCalendar();
+  const melovemDays = planMelovem ? selectedMelovemDates().length : 1;
+  $('#dose-preview').innerHTML = `
+    <div><span>${escapeHtml(medicine.name)} · ${selectedMelovem ? daysLabel(melovemDays) : courseLabel(medicine)}</span><strong>${formatDose(dose)} ml/day</strong></div>
+    ${includeMelovem ? `<div><span>Melovem · ${daysLabel(melovemDays)}</span><strong>${formatDose(calculateDose(melovem, weight))} ml/day</strong></div>` : ''}`;
+}
+
+function renderMelovemCalendar() {
+  const baseDate = $('#plan-form').injection_date.value;
+  const calendar = $('#melovem-calendar');
+  if (!baseDate || calendar.dataset.baseDate === baseDate) return;
+  calendar.dataset.baseDate = baseDate;
+  calendar.innerHTML = Array.from({ length: 7 }, (_, offset) => {
+    const date = new Date(`${baseDate}T00:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + offset);
+    const value = date.toISOString().slice(0, 10);
+    const weekday = new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: 'UTC' }).format(date);
+    return `<label class="melovem-day"><input type="checkbox" value="${value}" ${offset === 0 ? 'checked disabled' : ''}><span>${weekday}</span><small>${value.slice(5)}</small></label>`;
+  }).join('');
+}
+
+function selectedMelovemDates() {
+  const baseDate = $('#plan-form').injection_date.value;
+  return [baseDate, ...[...document.querySelectorAll('#melovem-calendar input:checked:not(:disabled)')].map(input => input.value)];
+}
+
+let warningRequestSequence = 0;
+async function updateRecentMedicineWarning() {
+  const form = $('#plan-form');
+  const warning = $('#recent-medicine-warning');
+  const medicine = references?.medicines.find(item => String(item.id) === form.medicine_sow_id.value);
+  const sowNumber = form.sow_number.value.trim();
+  const plannedDate = form.injection_date.value;
+  const sequence = ++warningRequestSequence;
+  warning.hidden = true;
+  if (!medicine || !sowNumber || !plannedDate) return;
+  try {
+    const result = await api(`/api/farestald/mobile/recent-treatment-warning?sow_number=${encodeURIComponent(sowNumber)}&medicine_sow_id=${medicine.id}&planned_date=${plannedDate}`);
+    if (sequence !== warningRequestSequence || !result.warning) return;
+    warning.innerHTML = `<strong>Warning: maybe this antibiotic did not help</strong>This sow received ${escapeHtml(result.warning.medicine_name)} for ${escapeHtml(result.warning.diagnosis)} on ${escapeHtml(result.warning.injection_date)}.`;
+    warning.hidden = false;
+  } catch (error) {
+    if (sequence === warningRequestSequence) $('#plan-error').textContent = error.message;
+  }
+}
+
+$('#pin-keypad').addEventListener('click', event => {
+  const button = event.target.closest('button');
+  if (!button) return;
+  const input = $('#login-password');
+  if (button.dataset.pin !== undefined && input.value.length < 32) input.value += button.dataset.pin;
+  if (button.hasAttribute('data-pin-backspace')) input.value = input.value.slice(0, -1);
+  if (button.hasAttribute('data-pin-clear')) input.value = '';
+  $('#login-error').textContent = '';
+});
+
+function courseLabel(medicine) {
+  const days = Math.max(1, Number(medicine.course_days) || 0);
+  return daysLabel(days);
+}
+
+function daysLabel(days) { return `${days} day${days === 1 ? '' : 's'}`; }
+
+function calculateDose(medicine, weight) {
+  const doseKg = Number(medicine.dose_kg);
+  return doseKg > 0 ? weight * Number(medicine.dose_ml) / doseKg : 0;
+}
+
+function formatDose(value) {
+  return Number(value.toFixed(3)).toLocaleString(undefined, { maximumFractionDigits: 3 });
+}
+
+$('#plan-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const button = event.submitter;
+  button.disabled = true;
+  $('#plan-error').textContent = '';
+  const data = Object.fromEntries(new FormData(event.currentTarget));
+  data.pen_id = Number(data.pen_id);
+  data.medicine_sow_id = Number(data.medicine_sow_id);
+  data.weight_kg = Number(data.weight_kg);
+  data.include_melovem = data.include_melovem === 'on';
+  data.melovem_dates = selectedMelovemDates();
+  data.comment = data.comment.trim() || null;
+  try {
+    const result = await api('/api/farestald/mobile/plans', { method: 'POST', body: JSON.stringify(data) });
+    showScreen('home');
+    toast(`${result.plans.length} injection${result.plans.length === 1 ? '' : 's'} added to plan`);
+  } catch (error) {
+    $('#plan-error').textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+});
+
+async function loadToday() {
+  const list = $('#today-list');
+  list.innerHTML = '<div class="empty">Loading…</div>';
+  try {
+    todayItems = await api(`/api/farestald/mobile/today?date=${localDate()}`);
+    todayItems.sort(comparePens);
+    renderMedicineSummary();
+    list.innerHTML = todayItems.length ? todayItems.map(item => `
+      <article class="injection-card today-injection-card">
+        <header><div><small class="pen-label">PEN</small><h2 class="pen-number">${escapeHtml(item.pen_name)}</h2></div><strong class="sow-number">Sow ${escapeHtml(item.sow_number)}</strong></header>
+        <div class="medicine">${escapeHtml(item.medicine_name)}</div>
+        <div class="meta"><span>Dose: <strong>${item.dose_ml} ml</strong></span><span>${escapeHtml(item.comment || 'No comment')}</span></div>
+        <div class="card-actions">
+          <button class="skip-button" data-skip="${item.id}" type="button">Skip</button>
+          <button class="complete-button" data-complete="${item.id}" type="button">Register as done</button>
+        </div>
+      </article>`).join('') : '<div class="empty">No planned injections for this date.</div>';
+    list.querySelectorAll('[data-complete]').forEach(button => {
+      button.addEventListener('click', () => openComplete(todayItems.find(item => String(item.id) === button.dataset.complete)));
+    });
+    list.querySelectorAll('[data-skip]').forEach(button => {
+      button.addEventListener('click', () => skipInjection(button.dataset.skip, button));
+    });
+  } catch (error) {
+    $('#medicine-summary').innerHTML = '';
+    list.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
+  }
+}
+
+function formatHistoryDate(value) {
+  const [year, month, day] = String(value).slice(0, 10).split('-');
+  return year && month && day ? `${day}.${month}.${year}` : escapeHtml(value);
+}
+
+function comparePens(left, right) {
+  const a = String(left.pen_name).trim();
+  const b = String(right.pen_name).trim();
+  const aDotted = a.includes('.');
+  const bDotted = b.includes('.');
+  if (aDotted !== bDotted) return aDotted ? 1 : -1;
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+}
+
+function renderMedicineSummary() {
+  const medicines = new Map();
+  for (const item of todayItems) {
+    const current = medicines.get(item.medicine_name) || { count: 0, dose: 0 };
+    current.count += 1;
+    current.dose += Number(item.dose_ml);
+    medicines.set(item.medicine_name, current);
+  }
+  $('#medicine-summary').innerHTML = medicines.size ? `
+    <h2>Medicine totals</h2>
+    <div class="summary-table">
+      ${[...medicines].sort(([a], [b]) => a.localeCompare(b)).map(([name, total]) => `
+        <div><strong>${escapeHtml(name)}</strong><span>${total.count} injection${total.count === 1 ? '' : 's'}</span><b>${formatDose(total.dose)} ml</b></div>
+      `).join('')}
+    </div>` : '';
+}
+
+async function skipInjection(id, button) {
+  if (!confirm('Skip this planned injection? It will not be added to done injections.')) return;
+  button.disabled = true;
+  try {
+    await api(`/api/farestald/mobile/plans/${id}/skip`, { method: 'DELETE' });
+    await loadToday();
+    toast('Planned injection skipped');
+  } catch (error) {
+    button.disabled = false;
+    toast(error.message);
+  }
+}
+
+function openComplete(item) {
+  const form = $('#complete-form');
+  form.reset();
+  form.id.value = item.id;
+  form.injection_date.value = localDate();
+  form.dose_ml.value = item.dose_ml;
+  form.comment.value = item.comment || '';
+  $('#complete-title').textContent = `Sow ${item.sow_number}`;
+  $('#complete-details').innerHTML = `<dt>Pen</dt><dd>${escapeHtml(item.pen_name)}</dd><dt>Medicine</dt><dd>${escapeHtml(item.medicine_name)}</dd>`;
+  $('#complete-error').textContent = '';
+  $('#complete-dialog').showModal();
+}
+
+$('#complete-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const button = event.submitter;
+  button.disabled = true;
+  $('#complete-error').textContent = '';
+  const data = Object.fromEntries(new FormData(event.currentTarget));
+  const id = data.id;
+  delete data.id;
+  data.dose_ml = Number(data.dose_ml);
+  data.comment = data.comment.trim() || null;
+  try {
+    await api(`/api/farestald/mobile/plans/${id}/complete`, { method: 'POST', body: JSON.stringify(data) });
+    $('#complete-dialog').close();
+    await loadToday();
+    toast('Injection registered');
+  } catch (error) {
+    $('#complete-error').textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+});
+
+$('#show-today').addEventListener('click', () => { showScreen('today'); loadToday(); });
+$('#back-button').addEventListener('click', () => showScreen('home'));
+$('#logout-button').addEventListener('click', signOut);
+$('#complete-close').addEventListener('click', () => $('#complete-dialog').close());
+
+const installRequested = new URLSearchParams(location.search).get('install') === '1';
+const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+
+function showInstallDialog() {
+  if (!installRequested || standalone || $('#install-dialog').open) return;
+  const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  if (isIos) $('#install-message').textContent = 'In Safari, tap Share, then select Add to Home Screen.';
+  else if (!installPrompt) $('#install-message').textContent = 'Tap Install app. If no prompt appears, use the browser menu and select Install app.';
+  $('#install-dialog').showModal();
+}
+
+window.addEventListener('beforeinstallprompt', event => {
+  event.preventDefault();
+  installPrompt = event;
+  showInstallDialog();
+});
+
+$('#install-app').addEventListener('click', async () => {
+  if (!installPrompt) {
+    const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    $('#install-message').textContent = isIos
+      ? 'In Safari, tap Share, then select Add to Home Screen.'
+      : 'Open the browser menu and select Install app or Add to Home screen.';
+    return;
+  }
+  await installPrompt.prompt();
+  installPrompt = null;
+  $('#install-dialog').close();
+});
+
+$('#install-dismiss').addEventListener('click', () => $('#install-dialog').close());
+window.addEventListener('appinstalled', () => { if ($('#install-dialog').open) $('#install-dialog').close(); });
+setTimeout(showInstallDialog, 500);
+
+function toast(message) {
+  const element = $('#toast');
+  element.textContent = message;
+  element.classList.add('show');
+  setTimeout(() => element.classList.remove('show'), 2200);
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
+}
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/farestald-injections/sw.js', { scope: '/farestald-injections/', updateViaCache: 'none' })
+    .then(registration => registration.update())
+    .catch(() => {});
+}
+restoreSession();

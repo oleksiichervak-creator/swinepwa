@@ -30,6 +30,7 @@ docker compose up --build
 - Install from **Farestald → Medicine → Medicine Sow → Install Farestald Injections**, or open `/farestald-injections/?install=1`.
 - Separate PWA identity, scope, icon, cache and login token from the Lobe/Dragte application. Uses the same user accounts.
 - Exactly two home actions: **Add injection** and **Injections for today**.
+- These screens match Dragte: user picker and PIN keypad, five-step planning, treatment history, recent-treatment warnings, weight buttons, optional Melovem with selected dates, today's medicine totals, pen sorting, Skip and completion.
 - Signed-in farm workers can plan a course using Farestald medicines and pens. Dose is calculated from weight; one injection per course day is scheduled, matching the existing Dragte planning behavior.
 - `POST /api/farestald/mobile/plans`, `GET /api/farestald/mobile/today?date=YYYY-MM-DD`, `POST /api/farestald/mobile/plans/:id/complete`.
 - Completion atomically moves a planned treatment into `farestald_done_sow_injections` and records the signed-in user. Repeated or concurrent completion cannot create duplicate completed records.
