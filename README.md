@@ -17,6 +17,14 @@ docker compose up --build
 
 ## API
 
+### User department access
+
+- Administrators manage **Department access** in Users: `lobe_dragte`, `farestald`, or both. Administrators always have access to both; Farm and Daily work remain shared.
+- `POST /api/users` and `PUT /api/users/:id` accept `department_access` as a nonempty array. Omitting it during an update preserves existing grants.
+- Existing users receive both grants during the migration. New users created through the dashboard default to Lobe/Dragte; adjust the checkboxes as needed.
+- Department APIs (including legacy aliases and print/export routes) check grants against the current database record on every request. Role changes, revoked access and deleted accounts affect existing sessions immediately.
+- Mobile sign-in and user lists use `department=lobe_dragte` or `department=farestald`. The website hides unavailable department groups and does not load their data.
+
 ### Farestald
 
 - Separate dashboard groups: Medicine (Medicine Sow, Medicine Sow Storage) and Sow injections (Planned, Done).

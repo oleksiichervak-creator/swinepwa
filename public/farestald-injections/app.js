@@ -34,7 +34,7 @@ async function api(path, options = {}) {
 async function loadUsers() {
   const grid = $('#login-users');
   try {
-    const users = await api('/api/auth/users');
+    const users = await api('/api/auth/users?department=farestald');
     grid.innerHTML = users.length
       ? users.map(user => `<button class="user-button" type="button" data-username="${escapeHtml(user.username)}"><span>${escapeHtml(userInitials(user.username))}</span><strong>${escapeHtml(user.username)}</strong></button>`).join('')
       : '<span>No users available</span>';
@@ -66,7 +66,7 @@ $('#login-form').addEventListener('submit', async event => {
   try {
     const result = await api('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ username: $('#login-user').value, password: $('#login-password').value }),
+      body: JSON.stringify({ username: $('#login-user').value, password: $('#login-password').value, department:'farestald' }),
     });
     token = result.token;
     currentUser = result.user;
@@ -83,9 +83,10 @@ $('#login-form').addEventListener('submit', async event => {
 async function restoreSession() {
   if (!token) return loadUsers();
   try {
-    currentUser = await api('/api/auth/me');
+    currentUser = await api('/api/auth/me?department=farestald');
     await enterApp();
   } catch {
+    signOut();
     await loadUsers();
   }
 }

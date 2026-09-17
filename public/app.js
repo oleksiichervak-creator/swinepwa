@@ -81,6 +81,12 @@ async function api(path, options = {}) {
   return response.status === 204 ? null : response.json();
 }
 
+const lobeDragtePages = ['medicine-sow','medicine-sow-storage','sow-injections','done-sow','altersyn','done-altersyn','vaccines','vaccination-schedules','planned-vaccines','done-vaccines','sickplace'];
+const hasDepartment = department => me?.role === 'admin' || (me?.department_access || []).includes(department);
+function allowedPage(page) {
+  if (page.startsWith('farestald-')) return hasDepartment('farestald');
+  return !lobeDragtePages.includes(page) || hasDepartment('lobe_dragte');
+}
 async function showAdmin() {
   try {
     me = await api('/auth/me');
@@ -107,7 +113,10 @@ async function showAdmin() {
     $('#add-done-vaccine').hidden = me.role !== 'admin';
     $('#add-sickplace').hidden = me.role !== 'admin';
     $('#add-todo').hidden = me.role !== 'admin';
-    await Promise.all([loadUsers(), loadDepartments(), loadRooms(), loadPens(), loadMedicineSow(), loadMedicineSowStorage(), loadSowInjections(), loadDoneSow(), loadVetQuestions(), loadFiles(), loadDailyRemarks(), loadRepairLocations(), loadAltresyn(), loadDoneAltresyn(), loadVaccines(), loadVaccinationSchedules(), loadPlannedVaccines(), loadDoneVaccines(), loadTodos(), loadSickplace(), farestald.load()]);
+    document.querySelectorAll('[data-department]').forEach(group => group.hidden = !hasDepartment(group.dataset.department));
+    await Promise.all([loadUsers(), loadDepartments(), loadRooms(), loadPens(), loadVetQuestions(), loadFiles(), loadDailyRemarks(), loadRepairLocations(), loadTodos(),
+      ...(hasDepartment('lobe_dragte') ? [loadMedicineSow(), loadMedicineSowStorage(), loadSowInjections(), loadDoneSow(), loadAltresyn(), loadDoneAltresyn(), loadVaccines(), loadVaccinationSchedules(), loadPlannedVaccines(), loadDoneVaccines(), loadSickplace()] : []),
+      ...(hasDepartment('farestald') ? [farestald.load()] : [])]);
     if (location.hash === '#seekplace') history.replaceState(null, '', '#sickplace');
     const requestedPage = ['#departments','#rooms','#pens','#medicine-sow','#medicine-sow-storage','#sow-injections','#done-sow','#vet-questions','#file-storage','#daily-remarks','#repair-locations','#altersyn','#done-altersyn','#vaccines','#vaccination-schedules','#planned-vaccines','#done-vaccines','#todos','#sickplace',...farestald.pages.map(page=>'#'+page)].includes(location.hash) ? location.hash.slice(1) : 'users';
     switchPage(requestedPage);
@@ -117,7 +126,7 @@ async function showAdmin() {
 async function loadUsers() {
   const users = await api('/users');
   $('#users-count').textContent = users.length;
-  $('#users').innerHTML = users.map(user => `<tr><td>${user.id}</td><td>${escapeHtml(user.username)}</td><td><span class="role">${user.role}</span></td><td>${new Date(user.created_at).toLocaleString('en-GB')}</td><td><div class="row-actions">${me.role === 'admin' ? `<button class="secondary edit" data-id="${user.id}">Edit</button><button class="danger delete" data-id="${user.id}" ${String(user.id) === String(me.id) ? 'disabled' : ''}>Delete</button>` : ''}</div></td></tr>`).join('');
+  $('#users').innerHTML = users.map(user => `<tr><td>${user.id}</td><td>${escapeHtml(user.username)}</td><td><span class="role">${user.role}</span></td><td>${user.role==='admin'?'All departments':(user.department_access||[]).map(department=>department==='lobe_dragte'?'Lobe/Dragte':'Farestald').join(', ')}</td><td>${new Date(user.created_at).toLocaleString('en-GB')}</td><td><div class="row-actions">${me.role === 'admin' ? `<button class="secondary edit" data-id="${user.id}">Edit</button><button class="danger delete" data-id="${user.id}" ${String(user.id) === String(me.id) ? 'disabled' : ''}>Delete</button>` : ''}</div></td></tr>`).join('');
   document.querySelectorAll('.edit').forEach(button => button.onclick = () => editUser(users.find(user => String(user.id) === button.dataset.id)));
   document.querySelectorAll('.delete').forEach(button => button.onclick = () => deleteUser(button.dataset.id));
 }
@@ -243,6 +252,7 @@ function renderVaccinationCycle(items){
 async function loadPlannedVaccines(){const items=await api('/planned-vaccines/');$('#planned-vaccines-count').textContent=items.length;$('#planned-vaccines').innerHTML=items.length?items.map(x=>`<tr><td>${x.id}</td><td>${escapeHtml(x.vaccine_name)}</td><td>${x.vaccination_date?formatDisplayDate(x.vaccination_date):'—'}</td><td>${x.week_number}</td><td>${escapeHtml(x.group_number)}${x.insemination_year?` / ${x.insemination_year}`:''}</td><td><span class="role">${escapeHtml(x.recipient)}</span></td><td>${x.pig_count??'—'}</td><td><div class="row-actions">${me.role==='admin'?`<button class="secondary planned-vaccine-edit" data-id="${x.id}">Edit</button><button class="danger planned-vaccine-delete" data-id="${x.id}">Delete</button>`:''}</div></td></tr>`).join(''):'<tr><td colspan="8" class="empty-state">No planned vaccines yet.</td></tr>';document.querySelectorAll('.planned-vaccine-edit').forEach(b=>b.onclick=()=>openPlannedVaccine(items.find(x=>String(x.id)===b.dataset.id)));document.querySelectorAll('.planned-vaccine-delete').forEach(b=>b.onclick=()=>deletePlannedVaccine(b.dataset.id));}
 async function loadDoneVaccines(){const items=await api('/done-vaccines/');$('#done-vaccines-count').textContent=items.length;$('#done-vaccines').innerHTML=items.length?items.map(x=>`<tr><td>${x.id}</td><td>${escapeHtml(x.vaccine_name)}</td><td>${x.week_number}</td><td>${escapeHtml(x.group_number)}</td><td><span class="role">${escapeHtml(x.recipient)}</span></td><td>${x.pig_count}</td><td>${x.vaccine_used_ml}</td><td>${formatDisplayDate(x.vaccination_date)}</td><td>${escapeHtml(x.given_by_username)}</td><td><div class="row-actions">${me.role==='admin'?`<button class="secondary done-vaccine-edit" data-id="${x.id}">Edit</button><button class="danger done-vaccine-delete" data-id="${x.id}">Delete</button>`:''}</div></td></tr>`).join(''):'<tr><td colspan="10" class="empty-state">No completed vaccinations yet.</td></tr>';document.querySelectorAll('.done-vaccine-edit').forEach(b=>b.onclick=()=>openDoneVaccine(items.find(x=>String(x.id)===b.dataset.id)));document.querySelectorAll('.done-vaccine-delete').forEach(b=>b.onclick=()=>deleteDoneVaccine(b.dataset.id));}
 function switchPage(page) {
+  if (!allowedPage(page)) page = 'users';
   for (const name of farestald.pages) document.getElementById(name+'-page').hidden = page !== name;
   document.querySelectorAll('.nav-button').forEach(item => {
     const active = item.dataset.page === page;
@@ -275,15 +285,24 @@ $('#login-form').onsubmit = async (event) => {
 function openDialog(user = {}) {
   const form = $('#user-form'); form.reset();
   form.id.value = user.id || ''; form.username.value = user.username || ''; form.role.value = user.role || 'user';
+  form.querySelectorAll('[name="department_access"]').forEach(box=>box.checked=(user.department_access || ['lobe_dragte']).includes(box.value));
+  updateUserDepartmentControls();
   form.password.required = !user.id; $('#dialog-title').textContent = user.id ? 'Edit user' : 'New user';
   $('#form-error').textContent = ''; $('#user-dialog').showModal();
 }
+function updateUserDepartmentControls() {
+  const admin = $('#user-form').role.value === 'admin';
+  $('#user-form').querySelectorAll('[name="department_access"]').forEach(box=>{box.disabled=admin;if(admin)box.checked=true;});
+}
+$('#user-form').role.onchange = updateUserDepartmentControls;
 function editUser(user) { openDialog(user); }
 async function deleteUser(id) { if (confirm('Delete this user?')) { try { await api(`/users/${id}`, { method: 'DELETE' }); await loadUsers(); } catch (error) { alert(error.message); } } }
 $('#add-user').onclick = () => openDialog(); $('#cancel').onclick = () => $('#user-dialog').close();
 $('#user-form').onsubmit = async (event) => {
   event.preventDefault(); $('#form-error').textContent = '';
   const data = Object.fromEntries(new FormData(event.target)); const id = data.id; delete data.id;
+  data.department_access = data.role==='admin'?['lobe_dragte','farestald']:new FormData(event.target).getAll('department_access');
+  if (!data.department_access.length) { $('#form-error').textContent='Select at least one department'; return; }
   if (!data.password) delete data.password;
   try { await api(id ? `/users/${id}` : '/users', { method: id ? 'PUT' : 'POST', body: JSON.stringify(data) }); $('#user-dialog').close(); await loadUsers(); }
   catch (error) { $('#form-error').textContent = error.message; }

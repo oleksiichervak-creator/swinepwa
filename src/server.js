@@ -1,3 +1,4 @@
+import { DEPARTMENT_ACCESS, validateDepartmentAccess, canAccessDepartment } from './department-access.js';
 import express from 'express';
 import { createFarestaldRouter } from './farestald.js';
 import { validateSeekplace } from './seekplace.js';
@@ -31,25 +32,35 @@ app.post('/api/auth/login', async (req, res, next) => {
     if (!user || !(await bcrypt.compare(password, user.password_hash))) {
       return res.status(401).json({ error: 'Invalid username or password' });
     }
+    if (req.body.department !== undefined) {
+      if (!DEPARTMENT_ACCESS.includes(req.body.department)) return res.status(400).json({error:'Invalid department'});
+      if (!canAccessDepartment(user,req.body.department)) return res.status(403).json({error:'You do not have access to this department'});
+    }
     res.json({ token: createToken(user), user: publicUser(user) });
   } catch (error) { next(error); }
 });
 
-app.get('/api/auth/users', async (_req, res, next) => {
+app.get('/api/auth/users', async (req, res, next) => {
   try {
-    res.json((await pool.query('SELECT username FROM users ORDER BY lower(username), id')).rows);
+    const department=req.query.department;
+    if(department!==undefined&&!DEPARTMENT_ACCESS.includes(department))return res.status(400).json({error:'Invalid department'});
+    res.json((await pool.query("SELECT username FROM users"+(department?" WHERE role='admin' OR $1=ANY(department_access)":"")+' ORDER BY lower(username), id',department?[department]:[])).rows);
   } catch (error) { next(error); }
 });
 
 app.get('/api/auth/me', requireAuth, async (req, res, next) => {
   try {
+    if(req.query.department!==undefined) {
+      if(!DEPARTMENT_ACCESS.includes(req.query.department))return res.status(400).json({error:'Invalid department'});
+      if(!canAccessDepartment(req.user,req.query.department))return res.status(403).json({error:'You do not have access to this department'});
+    }
     const result = await pool.query(userSelect + ' WHERE id = $1', [req.user.sub]);
     if (!result.rows[0]) return res.status(404).json({ error: 'User not found' });
     res.json(result.rows[0]);
   } catch (error) { next(error); }
 });
 
-const userSelect = 'SELECT id, username, role, created_at, updated_at FROM users';
+const userSelect = 'SELECT id, username, role, department_access, created_at, updated_at FROM users';
 
 app.get('/api/users', requireAuth, async (_req, res, next) => {
   try { res.json((await pool.query(userSelect + ' ORDER BY id')).rows); }
@@ -69,8 +80,8 @@ app.post('/api/users', requireAuth, requireAdmin, async (req, res, next) => {
     const input = validateUser(req.body, true);
     const hash = await bcrypt.hash(input.password, 12);
     const result = await pool.query(
-      'INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3) RETURNING id, username, role, created_at, updated_at',
-      [input.username, hash, input.role],
+      'INSERT INTO users (username, password_hash, role, department_access) VALUES ($1, $2, $3, $4) RETURNING id, username, role, department_access, created_at, updated_at',
+      [input.username, hash, input.role, input.departmentAccess],
     );
     res.status(201).json(result.rows[0]);
   } catch (error) { handleDbError(error, res, next); }
@@ -78,16 +89,19 @@ app.post('/api/users', requireAuth, requireAdmin, async (req, res, next) => {
 
 app.put('/api/users/:id', requireAuth, requireAdmin, async (req, res, next) => {
   try {
-    const input = validateUser(req.body, false);
-    const fields = ['username = $1', 'role = $2', 'updated_at = NOW()'];
-    const values = [input.username, input.role];
+    const current=await pool.query('SELECT department_access FROM users WHERE id=$1',[req.params.id]);
+    if(!current.rowCount)return res.status(404).json({error:'User not found'});
+    const input = validateUser({...req.body,department_access:req.body.department_access===undefined?current.rows[0].department_access:req.body.department_access}, false);
+    if(String(req.user.sub)===String(req.params.id)&&input.role!=='admin')return res.status(400).json({error:'You cannot remove your own administrator role'});
+    const fields = ['username = $1', 'role = $2', 'department_access = $3', 'updated_at = NOW()'];
+    const values = [input.username, input.role, input.departmentAccess];
     if (input.password) {
       values.push(await bcrypt.hash(input.password, 12));
       fields.push(`password_hash = $${values.length}`);
     }
     values.push(req.params.id);
     const result = await pool.query(
-      `UPDATE users SET ${fields.join(', ')} WHERE id = $${values.length} RETURNING id, username, role, created_at, updated_at`, values,
+      `UPDATE users SET ${fields.join(', ')} WHERE id = $${values.length} RETURNING id, username, role, department_access, created_at, updated_at`, values,
     );
     if (!result.rows[0]) return res.status(404).json({ error: 'User not found' });
     res.json(result.rows[0]);
@@ -1117,10 +1131,11 @@ function validateUser(body, passwordRequired) {
   if (username.length < 2 || username.length > 100) throw Object.assign(new Error('Username must be between 2 and 100 characters'), { status: 400 });
   if ((passwordRequired || password) && password.length < 4) throw Object.assign(new Error('Password must be at least 4 characters long'), { status: 400 });
   if (!['admin', 'user'].includes(role)) throw Object.assign(new Error('Invalid role'), { status: 400 });
-  return { username, password, role };
+  const departmentAccess=role==='admin'?[...DEPARTMENT_ACCESS]:validateDepartmentAccess(body.department_access===undefined?DEPARTMENT_ACCESS:body.department_access);
+  return { username, password, role, departmentAccess };
 }
 
-function publicUser(user) { return { id: user.id, username: user.username, role: user.role }; }
+function publicUser(user) { return { id: user.id, username: user.username, role: user.role, department_access: user.department_access }; }
 function handleDbError(error, res, next) {
   if (error.status) return res.status(error.status).json({ error: error.message });
   if (error.code === '23505') return res.status(409).json({ error: 'A record with this value already exists' });

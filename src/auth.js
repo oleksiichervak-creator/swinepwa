@@ -1,4 +1,6 @@
 import jwt from 'jsonwebtoken';
+import { pool } from './db.js';
+import { canAccessDepartment, routeDepartment } from './department-access.js';
 
 function secret() {
   return process.env.JWT_SECRET || 'development-only-secret';
@@ -10,15 +12,26 @@ export function createToken(user) {
   });
 }
 
-export function requireAuth(req, res, next) {
+export async function requireAuth(req, res, next) {
   const header = req.headers.authorization || '';
   if (!header.startsWith('Bearer ')) return res.status(401).json({ error: 'Authentication required' });
+  return authenticate(req,res,next,header.slice(7));
+}
+
+async function authenticate(req,res,next,token) {
+  let claims;
+  try { claims=jwt.verify(token,secret()); }
+  catch { return res.status(401).json({error:'Your session is invalid or has expired'}); }
+  if(!/^[1-9]\d*$/.test(String(claims.sub)) || BigInt(claims.sub)>9223372036854775807n)return res.status(401).json({error:'Invalid account'});
   try {
-    req.user = jwt.verify(header.slice(7), secret());
+    // Re-read permissions on every request: existing sessions immediately respect changes.
+    const user=(await pool.query('SELECT id,username,role,department_access FROM users WHERE id=$1',[claims.sub])).rows[0];
+    if(!user)return res.status(401).json({error:'Account no longer exists'});
+    req.user={...user,sub:String(user.id)};
+    const department=routeDepartment(req.originalUrl);
+    if(department&&!canAccessDepartment(user,department))return res.status(403).json({error:'You do not have access to this department'});
     next();
-  } catch {
-    res.status(401).json({ error: 'Your session is invalid or has expired' });
-  }
+  } catch(error) { next(error); }
 }
 
 export function requireAdmin(req, res, next) {
@@ -26,9 +39,8 @@ export function requireAdmin(req, res, next) {
   next();
 }
 
-export function requireAuthOrQueryToken(req, res, next) {
+export async function requireAuthOrQueryToken(req, res, next) {
   const token = req.query.token || (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
   if (!token) return res.status(401).json({ error: 'Authentication required' });
-  try { req.user = jwt.verify(token, secret()); next(); }
-  catch { res.status(401).json({ error: 'Your session is invalid or has expired' }); }
+  return authenticate(req,res,next,token);
 }

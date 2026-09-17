@@ -37,6 +37,10 @@ export async function initializeDatabase() {
   `);
 
   await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS department_access TEXT[] NOT NULL
+      DEFAULT ARRAY['lobe_dragte','farestald']::text[]
+  `);
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS departments (
       id BIGSERIAL PRIMARY KEY,
       name VARCHAR(150) NOT NULL UNIQUE,
