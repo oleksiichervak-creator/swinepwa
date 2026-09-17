@@ -1,6 +1,8 @@
+import { setupFarestald } from './farestald.js';
 const $ = (selector) => document.querySelector(selector);
 let token = localStorage.getItem('token');
 let me = null;
+const farestald = setupFarestald({ api, getUser: () => me });
 let doneSowItems = [];
 let doneSowSort = { key: 'injection_date', direction: 'asc' };
 
@@ -105,9 +107,9 @@ async function showAdmin() {
     $('#add-done-vaccine').hidden = me.role !== 'admin';
     $('#add-sickplace').hidden = me.role !== 'admin';
     $('#add-todo').hidden = me.role !== 'admin';
-    await Promise.all([loadUsers(), loadDepartments(), loadRooms(), loadPens(), loadMedicineSow(), loadMedicineSowStorage(), loadSowInjections(), loadDoneSow(), loadVetQuestions(), loadFiles(), loadDailyRemarks(), loadRepairLocations(), loadAltresyn(), loadDoneAltresyn(), loadVaccines(), loadVaccinationSchedules(), loadPlannedVaccines(), loadDoneVaccines(), loadTodos(), loadSickplace()]);
+    await Promise.all([loadUsers(), loadDepartments(), loadRooms(), loadPens(), loadMedicineSow(), loadMedicineSowStorage(), loadSowInjections(), loadDoneSow(), loadVetQuestions(), loadFiles(), loadDailyRemarks(), loadRepairLocations(), loadAltresyn(), loadDoneAltresyn(), loadVaccines(), loadVaccinationSchedules(), loadPlannedVaccines(), loadDoneVaccines(), loadTodos(), loadSickplace(), farestald.load()]);
     if (location.hash === '#seekplace') history.replaceState(null, '', '#sickplace');
-    const requestedPage = ['#departments','#rooms','#pens','#medicine-sow','#medicine-sow-storage','#sow-injections','#done-sow','#vet-questions','#file-storage','#daily-remarks','#repair-locations','#altersyn','#done-altersyn','#vaccines','#vaccination-schedules','#planned-vaccines','#done-vaccines','#todos','#sickplace'].includes(location.hash) ? location.hash.slice(1) : 'users';
+    const requestedPage = ['#departments','#rooms','#pens','#medicine-sow','#medicine-sow-storage','#sow-injections','#done-sow','#vet-questions','#file-storage','#daily-remarks','#repair-locations','#altersyn','#done-altersyn','#vaccines','#vaccination-schedules','#planned-vaccines','#done-vaccines','#todos','#sickplace',...farestald.pages.map(page=>'#'+page)].includes(location.hash) ? location.hash.slice(1) : 'users';
     switchPage(requestedPage);
   } catch { logout(); }
 }
@@ -241,6 +243,7 @@ function renderVaccinationCycle(items){
 async function loadPlannedVaccines(){const items=await api('/planned-vaccines/');$('#planned-vaccines-count').textContent=items.length;$('#planned-vaccines').innerHTML=items.length?items.map(x=>`<tr><td>${x.id}</td><td>${escapeHtml(x.vaccine_name)}</td><td>${x.vaccination_date?formatDisplayDate(x.vaccination_date):'—'}</td><td>${x.week_number}</td><td>${escapeHtml(x.group_number)}${x.insemination_year?` / ${x.insemination_year}`:''}</td><td><span class="role">${escapeHtml(x.recipient)}</span></td><td>${x.pig_count??'—'}</td><td><div class="row-actions">${me.role==='admin'?`<button class="secondary planned-vaccine-edit" data-id="${x.id}">Edit</button><button class="danger planned-vaccine-delete" data-id="${x.id}">Delete</button>`:''}</div></td></tr>`).join(''):'<tr><td colspan="8" class="empty-state">No planned vaccines yet.</td></tr>';document.querySelectorAll('.planned-vaccine-edit').forEach(b=>b.onclick=()=>openPlannedVaccine(items.find(x=>String(x.id)===b.dataset.id)));document.querySelectorAll('.planned-vaccine-delete').forEach(b=>b.onclick=()=>deletePlannedVaccine(b.dataset.id));}
 async function loadDoneVaccines(){const items=await api('/done-vaccines/');$('#done-vaccines-count').textContent=items.length;$('#done-vaccines').innerHTML=items.length?items.map(x=>`<tr><td>${x.id}</td><td>${escapeHtml(x.vaccine_name)}</td><td>${x.week_number}</td><td>${escapeHtml(x.group_number)}</td><td><span class="role">${escapeHtml(x.recipient)}</span></td><td>${x.pig_count}</td><td>${x.vaccine_used_ml}</td><td>${formatDisplayDate(x.vaccination_date)}</td><td>${escapeHtml(x.given_by_username)}</td><td><div class="row-actions">${me.role==='admin'?`<button class="secondary done-vaccine-edit" data-id="${x.id}">Edit</button><button class="danger done-vaccine-delete" data-id="${x.id}">Delete</button>`:''}</div></td></tr>`).join(''):'<tr><td colspan="10" class="empty-state">No completed vaccinations yet.</td></tr>';document.querySelectorAll('.done-vaccine-edit').forEach(b=>b.onclick=()=>openDoneVaccine(items.find(x=>String(x.id)===b.dataset.id)));document.querySelectorAll('.done-vaccine-delete').forEach(b=>b.onclick=()=>deleteDoneVaccine(b.dataset.id));}
 function switchPage(page) {
+  for (const name of farestald.pages) document.getElementById(name+'-page').hidden = page !== name;
   document.querySelectorAll('.nav-button').forEach(item => {
     const active = item.dataset.page === page;
     item.classList.toggle('active', active); item.setAttribute('aria-selected', String(active));

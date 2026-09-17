@@ -17,6 +17,14 @@ docker compose up --build
 
 ## API
 
+### Farestald
+
+- Separate dashboard groups: Medicine (Medicine Sow, Medicine Sow Storage) and Sow injections (Planned, Done).
+- CRUD routes under `/api/farestald/`: `medicine-sow`, `medicine-sow-storage`, `planned-sow-injections`, `done-sow-injections`.
+- Four independent PostgreSQL tables: `farestald_medicine_sow`, `farestald_medicine_sow_storage`, `farestald_planed_sow_injections`, `farestald_done_sow_injections`. Created automatically at server startup; no Lobe/Dragte records are copied.
+- Stock and injections reference only the Farestald medicine table. Users and farm location directories are shared; injection forms and API accept only pens belonging to the Farestald department (`GET /api/farestald/pens`). Create its rooms and pens under Farm if needed.
+- Signed-in users can view; administrators can create, edit and delete. The existing Injections phone app remains attached to Lobe/Dragte.
+
 ### Sickplace
 
 - Tab: `#sickplace`; CRUD routes: `/api/sickplace/` and `/sickplace/` (GET, POST, GET/PATCH/DELETE `/:id`).

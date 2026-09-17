@@ -1,4 +1,5 @@
 import express from 'express';
+import { createFarestaldRouter } from './farestald.js';
 import { validateSeekplace } from './seekplace.js';
 import { renderSeekplaceCard } from './seekplace-card.js';
 import bcrypt from 'bcryptjs';
@@ -14,6 +15,7 @@ import { createToken, requireAdmin, requireAuth, requireAuthOrQueryToken } from 
 const app = express();
 app.disable('x-powered-by');
 app.use(express.json({ limit: '20kb' }));
+app.use('/api/farestald', createFarestaldRouter(pool));
 
 app.get('/api/health', async (_req, res) => {
   try { await pool.query('SELECT 1'); res.json({ status: 'ok' }); }
