@@ -729,45 +729,6 @@ injectionPwa.patch('/sickplace/:id/status', requireAuth, async (req, res, next) 
     res.json(result.rows[0]);
   } catch (error) { handleDbError(error, res, next); }
 });
-let pigNewsCache = { expiresAt: 0, items: [] };
-
-injectionPwa.get('/news', requireAuth, async (_req, res, next) => {
-  try {
-    if (pigNewsCache.expiresAt > Date.now() && pigNewsCache.items.length) return res.json(pigNewsCache.items);
-    const feedsToLoad = [
-      { region: 'Denmark', priority: 0, query: 'Denmark Danish pig production pork swine innovation when:60d' },
-      { region: 'Europe', priority: 1, query: 'Europe EU pig production swine industry innovation when:30d' },
-      { region: 'World', priority: 2, query: 'pig production swine health technology innovation when:30d' },
-    ];
-    const feeds = await Promise.all(feedsToLoad.map(async feed => {
-      const url = `https://news.google.com/rss/search?q=${encodeURIComponent(feed.query)}&hl=en&gl=US&ceid=US:en`;
-      const response = await fetch(url, { signal: AbortSignal.timeout(10000), headers: { 'User-Agent': 'SwinePWA/1.0' } });
-      if (!response.ok) throw new Error(`News provider returned ${response.status}`);
-      return { ...feed, xml: await response.text() };
-    }));
-    const unique = new Map();
-    for (const feed of feeds.sort((a,b) => a.priority - b.priority)) {
-      for (const block of feed.xml.match(/<item>[\s\S]*?<\/item>/gi) || []) {
-        const title = xmlTag(block, 'title');
-        const url = xmlTag(block, 'link');
-        const source = xmlTag(block, 'source') || 'Industry news';
-        const publishedAt = new Date(xmlTag(block, 'pubDate'));
-        if (!title || !url || !/^https:\/\//i.test(url) || Number.isNaN(publishedAt.getTime())) continue;
-        const cleanTitle = title.replace(new RegExp(`\\s+-\\s+${escapeRegExp(source)}$`, 'i'), '').trim();
-        const key = cleanTitle.toLocaleLowerCase();
-        if (!unique.has(key)) unique.set(key, { title: cleanTitle, url, source, region: feed.region, priority: feed.priority, published_at: publishedAt.toISOString() });
-      }
-    }
-    const items = [...unique.values()].sort((a, b) => a.priority - b.priority || b.published_at.localeCompare(a.published_at)).slice(0, 30).map(({priority,...item})=>item);
-    if (!items.length) throw new Error('No current pig production news was returned');
-    pigNewsCache = { expiresAt: Date.now() + 15 * 60 * 1000, items };
-    res.json(items);
-  } catch (error) {
-    if (pigNewsCache.items.length) return res.json(pigNewsCache.items);
-    next(Object.assign(new Error('Pig production news is temporarily unavailable'), { status: 503, cause: error }));
-  }
-});
-
 injectionPwa.get('/history', requireAuth, async (req, res, next) => {
   try {
     const sowNumber = String(req.query.sow_number || '').trim();
@@ -1145,9 +1106,6 @@ function validateDoneAltresyn(body){const groupNumber=Number(String(body.group??
 function doneAltresynValues(value){return[value.group,value.amount,value.extraDoses,value.doneDate,value.givenByUserId];}
 async function removeUnusedUpload(photo){if(!photo)return;const count=await pool.query(`SELECT (SELECT COUNT(*) FROM vet_questions WHERE photo=$1)+(SELECT COUNT(*) FROM daily_remarks WHERE photo=$1)+(SELECT COUNT(*) FROM repair_locations WHERE photo=$1) AS count`,[photo]);if(Number(count.rows[0].count)===0){const name=path.basename(photo);try{await fs.promises.unlink(path.join(uploadDir,name));}catch(e){if(e.code!=='ENOENT')throw e;}}}
 function validStoredName(value){const name=String(value||'');if(!/^[a-f0-9-]{36}(\.[a-z0-9]{1,10})?$/.test(name))throw Object.assign(new Error('Invalid stored file name'),{status:400});return name;}
-function xmlTag(xml,name){const match=xml.match(new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${name}>`,'i'));return match?decodeXml(match[1].replace(/^<!\[CDATA\[|\]\]>$/g,'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim()):'';}
-function decodeXml(value){return String(value).replace(/&#(\d+);/g,(_match,code)=>String.fromCodePoint(Number(code))).replace(/&#x([0-9a-f]+);/gi,(_match,code)=>String.fromCodePoint(Number.parseInt(code,16))).replace(/&(amp|lt|gt|quot|apos);/g,(_match,name)=>({amp:'&',lt:'<',gt:'>',quot:'"',apos:"'"})[name]);}
-function escapeRegExp(value){return String(value).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
 function sowLogDiagnosis(value){const raw=String(value||'').trim(),key=raw.toLocaleLowerCase().replace(/[–—]/g,'-').replace(/\s+/g,' ');const exact=new Map(['Heat issue','Farrow fever mild (FM)','Farrow fever severe (FS)','Skin infection (SKIN)','Intestinal worms','Arthritis mild (DB)','Arthritis severe (DBK)','Milk deficiency (OX)','Pain (M)','Diarrehea'].map(item=>[item.toLocaleLowerCase(),item]));if(exact.has(key))return exact.get(key);if(/severe.*(arthritis|bad leg)|(arthritis|bad leg).*severe|dbk/.test(key))return'Arthritis severe (DBK)';if(/arthritis|bad leg|\bdb\b/.test(key))return'Arthritis mild (DB)';if(/farrow.*fever.*severe|severe.*farrow.*fever|\bfs\b|40\+/.test(key))return'Farrow fever severe (FS)';if(/farrow.*fever|\bfm\b|39\s*-?\s*40/.test(key))return'Farrow fever mild (FM)';if(/milk|\box\b/.test(key))return'Milk deficiency (OX)';if(/skin|wound/.test(key))return'Skin infection (SKIN)';if(/diarr|diarrh/.test(key))return'Diarrehea';if(/worm/.test(key))return'Intestinal worms';if(/heat|missing heat/.test(key))return'Heat issue';if(/pain|unthrifty/.test(key))return'Pain (M)';return null;}
 
 function validateUser(body, passwordRequired) {
