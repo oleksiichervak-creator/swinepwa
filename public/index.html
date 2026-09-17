@@ -20,7 +20,7 @@
       </form>
     </section>
     <section id="admin" hidden>
-      <header><div><small>SWINE ADMIN</small><h1>Data tables</h1><p class="page-subtitle">Browse and test application data</p></div><div><a class="pwa-install-link" href="/injections/?install=1" style="display:inline-flex;align-items:center;border-radius:9px;padding:11px 18px;background:#286445;color:#fff;font-weight:700;text-decoration:none;white-space:nowrap">Install Injections</a><span id="current-user"></span><button class="secondary" id="logout">Sign out</button></div></header>
+      <header><div><small>SWINE ADMIN</small><h1>Data tables</h1><p class="page-subtitle">Browse and test application data</p></div><div><span id="current-user"></span><button class="secondary" id="logout">Sign out</button></div></header>
       <nav class="table-tabs" role="tablist" aria-label="Data tables">
         <button class="nav-button active" role="tab" aria-selected="true" aria-controls="users-page" data-page="users">Users <span id="users-count" class="count">0</span></button>
         <details class="nav-group"><summary>Farm</summary><div class="nav-group-items" role="group" aria-label="Farm"><button class="nav-button" role="tab" aria-selected="false" aria-controls="departments-page" data-page="departments">Departments <span id="departments-count" class="count">0</span></button><button class="nav-button" role="tab" aria-selected="false" aria-controls="rooms-page" data-page="rooms">Rooms <span id="rooms-count" class="count">0</span></button><button class="nav-button" role="tab" aria-selected="false" aria-controls="pens-page" data-page="pens">Pens <span id="pens-count" class="count">0</span></button></div></details>
@@ -51,7 +51,7 @@
         <div class="table-wrap"><table><thead><tr><th>ID</th><th>Name</th><th>Room</th><th>Department</th><th>Created</th><th>Updated</th><th></th></tr></thead><tbody id="pens"></tbody></table></div>
       </section>
       <section id="medicine-sow-page" role="tabpanel" hidden>
-        <div class="toolbar"><p>Manage medicines for sows</p><button id="add-medicine-sow">+ Add medicine</button></div>
+        <div class="toolbar"><p>Manage medicines for sows</p><div><a class="pwa-install-link" href="/injections/?install=1" style="display:inline-flex;align-items:center;border-radius:9px;padding:11px 18px;background:#286445;color:#fff;font-weight:700;text-decoration:none;white-space:nowrap">Install Injections</a><button id="add-medicine-sow">+ Add medicine</button></div></div>
         <div class="table-wrap"><table><thead><tr><th>ID</th><th>Name</th><th>Diagnosis</th><th>Dose ml</th><th>Dose kg</th><th>Course</th><th>Interval</th><th>Withdrawal</th><th></th></tr></thead><tbody id="medicine-sow"></tbody></table></div>
       </section>
       <section id="medicine-sow-storage-page" role="tabpanel" hidden>
