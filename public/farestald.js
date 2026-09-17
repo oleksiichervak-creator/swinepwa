@@ -15,7 +15,7 @@ export function setupFarestald({api,getUser}) {
   const caches = new Map();
   for (const section of sections) {
     const prefix = `farestald-${section.key}`;
-    $('#admin').insertAdjacentHTML('beforeend',`<section id="${prefix}-page" role="tabpanel" hidden><div class="toolbar"><p>Farestald · ${section.title}</p><button id="${prefix}-add">+ Add record</button></div><label>Search<input type="search" id="${prefix}-search" placeholder="Search records"></label><p class="error" id="${prefix}-error" role="alert"></p><div class="table-wrap"><table><thead><tr><th>ID</th>${section.fields.map(f=>`<th>${f.label}</th>`).join('')}<th></th></tr></thead><tbody id="${prefix}-rows"></tbody></table></div></section>`);
+    $('#admin').insertAdjacentHTML('beforeend',`<section id="${prefix}-page" role="tabpanel" hidden><div class="toolbar"><p>Farestald · ${section.title}</p><div>${section.key==='medicine-sow'?'<a class="pwa-install-link" href="/farestald-injections/?install=1" style="display:inline-flex;align-items:center;border-radius:9px;padding:11px 18px;background:#286445;color:#fff;font-weight:700;text-decoration:none">Install Farestald Injections</a>':''}<button id="${prefix}-add">+ Add record</button></div></div><label>Search<input type="search" id="${prefix}-search" placeholder="Search records"></label><p class="error" id="${prefix}-error" role="alert"></p><div class="table-wrap"><table><thead><tr><th>ID</th>${section.fields.map(f=>`<th>${f.label}</th>`).join('')}<th></th></tr></thead><tbody id="${prefix}-rows"></tbody></table></div></section>`);
     $(`#${prefix}-add`).onclick = () => open(section);
     $(`#${prefix}-search`).oninput = () => render(section);
   }

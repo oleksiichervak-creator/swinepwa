@@ -25,6 +25,16 @@ docker compose up --build
 - Stock and injections reference only the Farestald medicine table. Users and farm location directories are shared; injection forms and API accept only pens belonging to the Farestald department (`GET /api/farestald/pens`). Create its rooms and pens under Farm if needed.
 - Signed-in users can view; administrators can create, edit and delete. The existing Injections phone app remains attached to Lobe/Dragte.
 
+### Farestald Injections phone app
+
+- Install from **Farestald → Medicine → Medicine Sow → Install Farestald Injections**, or open `/farestald-injections/?install=1`.
+- Separate PWA identity, scope, icon, cache and login token from the Lobe/Dragte application. Uses the same user accounts.
+- Exactly two home actions: **Add injection** and **Injections for today**.
+- Signed-in farm workers can plan a course using Farestald medicines and pens. Dose is calculated from weight; one injection per course day is scheduled, matching the existing Dragte planning behavior.
+- `POST /api/farestald/mobile/plans`, `GET /api/farestald/mobile/today?date=YYYY-MM-DD`, `POST /api/farestald/mobile/plans/:id/complete`.
+- Completion atomically moves a planned treatment into `farestald_done_sow_injections` and records the signed-in user. Repeated or concurrent completion cannot create duplicate completed records.
+- Network access is required for reading and saving treatment data; only the application shell is cached offline.
+
 ### Sickplace
 
 - Tab: `#sickplace`; CRUD routes: `/api/sickplace/` and `/sickplace/` (GET, POST, GET/PATCH/DELETE `/:id`).

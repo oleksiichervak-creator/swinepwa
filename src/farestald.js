@@ -1,5 +1,6 @@
 import express from 'express';
 import { requireAuth, requireAdmin } from './auth.js';
+import { createFarestaldMobileRouter } from './farestald-mobile.js';
 
 const medicineFields = ['name','diagnosis','dose_ml','dose_kg','course_days','interval_hours','symptoms','withdrawal_days'];
 const injectionFields = ['sow_number','pen_id','injection_date','medicine_sow_id','dose_ml','weight_kg','comment'];
@@ -40,6 +41,7 @@ export function validateFarestald(resource, body = {}) {
 export function createFarestaldRouter(pool) {
   const router = express.Router();
   router.use(requireAuth);
+  router.use('/mobile', createFarestaldMobileRouter(pool, validateFarestald));
   const pens = `SELECT p.id,p.name,r.name AS room_name FROM pens p JOIN rooms r ON r.id=p.room_id JOIN departments d ON d.id=r.department_id WHERE lower(trim(d.name))='farestald'`;
   router.get('/pens', async (_req,res,next) => {
     try { res.json((await pool.query(pens + ' ORDER BY r.name,p.name')).rows); } catch (e) { next(e); }

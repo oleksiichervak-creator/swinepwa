@@ -1,0 +1,12 @@
+{
+  "id": "/farestald-injections/",
+  "name": "Farestald Injections",
+  "short_name": "Farestald",
+  "description": "Plan and register Farestald sow injections",
+  "start_url": "/farestald-injections/",
+  "scope": "/farestald-injections/",
+  "display": "standalone",
+  "background_color": "#eef3ef",
+  "theme_color": "#245c43",
+  "icons": [{"src":"/farestald-injections/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}
