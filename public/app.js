@@ -247,6 +247,11 @@ function switchPage(page) {
     const active = item.dataset.page === page;
     item.classList.toggle('active', active); item.setAttribute('aria-selected', String(active));
   });
+  document.querySelectorAll('.nav-group').forEach(group => {
+    const active = Boolean(group.querySelector('.nav-button.active'));
+    group.classList.toggle('has-active', active);
+    if (active) group.open = true;
+  });
   $('#sickplace-page').hidden=page!=='sickplace';
   $('#users-page').hidden=page!=='users';$('#departments-page').hidden=page!=='departments';$('#rooms-page').hidden=page!=='rooms';$('#pens-page').hidden=page!=='pens';$('#medicine-sow-page').hidden=page!=='medicine-sow';$('#medicine-sow-storage-page').hidden=page!=='medicine-sow-storage';$('#sow-injections-page').hidden=page!=='sow-injections';$('#done-sow-page').hidden=page!=='done-sow';$('#vet-questions-page').hidden=page!=='vet-questions';$('#file-storage-page').hidden=page!=='file-storage';$('#daily-remarks-page').hidden=page!=='daily-remarks';$('#repair-locations-page').hidden=page!=='repair-locations';$('#altersyn-page').hidden=page!=='altersyn';$('#done-altersyn-page').hidden=page!=='done-altersyn';$('#todos-page').hidden=page!=='todos';$('#pig-news-page').hidden=page!=='pig-news';$('#pig-game-page').hidden=page!=='pig-game';
   $('#vaccines-page').hidden=page!=='vaccines';$('#vaccination-schedules-page').hidden=page!=='vaccination-schedules';$('#planned-vaccines-page').hidden=page!=='planned-vaccines';$('#done-vaccines-page').hidden=page!=='done-vaccines';
