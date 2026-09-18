@@ -1,0 +1,23 @@
+name: Add requested stable pens
+on:
+  workflow_dispatch:
+concurrency:
+  group: production
+  cancel-in-progress: false
+jobs:
+  add-pens:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add and verify pens in existing rooms
+        env:
+          SSH_KEY: ${{ secrets.HETZNER_SSH_KEY }}
+          SSH_HOST: ${{ secrets.HETZNER_HOST }}
+          SSH_USER: ${{ secrets.HETZNER_USER }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
+          ssh "$SSH_USER@$SSH_HOST" 'cd /opt/swine-pwa && docker compose -f compose.production.yaml exec -T -w /app/scripts app node --input-type=module' < scripts/add-stable-pens.js
