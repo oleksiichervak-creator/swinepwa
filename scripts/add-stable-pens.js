@@ -18,7 +18,9 @@ try {
   for (const [name, first, last] of ranges) {
     const rooms = await client.query(`SELECT r.id, r.name, d.name AS department
       FROM rooms r JOIN departments d ON d.id=r.department_id
-      WHERE lower(regexp_replace(trim(r.name), '\\s+', ' ', 'g'))=lower($1)`, [name]);
+      WHERE lower(trim(d.name))='farestald'
+        AND lower(regexp_replace(trim(r.name), '\\s+', ' ', 'g'))=ANY($1::text[])`,
+    [name === 'Stable 1 wood door' ? ['stable 1 wood door', 'sable 1 wood door'] : [name.toLowerCase()]]);
     if (rooms.rowCount !== 1) throw new Error(`Expected one room named "${name}", found ${rooms.rowCount}. No changes saved.`);
     const room = rooms.rows[0];
     const inserted = await client.query(`INSERT INTO pens (name,room_id)
