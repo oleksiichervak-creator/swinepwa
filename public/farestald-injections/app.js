@@ -287,6 +287,11 @@ $('#add-melovem-days').addEventListener('click', () => {
   $('#add-melovem-days').setAttribute('aria-expanded', String(!calendar.hidden));
 });
 $('#melovem-calendar').addEventListener('change', updateDosePreview);
+$('#clear-melovem-days').addEventListener('click', () => {
+  renderMelovemCalendar();
+  document.querySelectorAll('#melovem-calendar input').forEach(input => { input.checked = false; });
+  updateDosePreview();
+});
 
 function updateDosePreview() {
   const form = $('#plan-form');
@@ -318,13 +323,13 @@ function renderMelovemCalendar() {
     date.setUTCDate(date.getUTCDate() + offset);
     const value = date.toISOString().slice(0, 10);
     const weekday = new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: 'UTC' }).format(date);
-    return `<label class="melovem-day"><input type="checkbox" value="${value}" ${offset === 0 ? 'checked disabled' : ''}><span>${weekday}</span><small>${value.slice(5)}</small></label>`;
+    return `<label class="melovem-day"><input type="checkbox" value="${value}" ${offset === 0 ? 'checked' : ''}><span>${weekday}</span><small>${value.slice(5)}</small></label>`;
   }).join('');
 }
 
 function selectedMelovemDates() {
   const baseDate = $('#plan-form').injection_date.value;
-  return [baseDate, ...[...document.querySelectorAll('#melovem-calendar input:checked:not(:disabled)')].map(input => input.value)];
+  return [...document.querySelectorAll('#melovem-calendar input:checked')].map(input => input.value);
 }
 
 let warningRequestSequence = 0;

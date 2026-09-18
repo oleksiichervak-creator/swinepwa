@@ -106,17 +106,17 @@ router.post('/plans', async (req, res, next) => {
       if (!melovem) throw Object.assign(new Error('Melovem is not available in the medicine list'), { status: 409 });
       medicines.push(melovem);
     }
-    if (requestedMelovemDays !== null && (!Number.isInteger(requestedMelovemDays) || requestedMelovemDays < 1 || requestedMelovemDays > 7)) {
-      throw Object.assign(new Error('Melovem planning days must be from 1 to 7'), { status: 400 });
+    if (requestedMelovemDays !== null && (!Number.isInteger(requestedMelovemDays) || requestedMelovemDays < 0 || requestedMelovemDays > 7)) {
+      throw Object.assign(new Error('Melovem planning days must be from 0 to 7'), { status: 400 });
     }
     let melovemDates;
     if (requestedMelovemDates !== undefined) {
-      if (!Array.isArray(requestedMelovemDates) || requestedMelovemDates.length < 1 || requestedMelovemDates.length > 7) {
-        throw Object.assign(new Error('Select from 1 to 7 Melovem dates'), { status: 400 });
+      if (!Array.isArray(requestedMelovemDates) || requestedMelovemDates.length > 7) {
+        throw Object.assign(new Error('Select from 0 to 7 Melovem dates'), { status: 400 });
       }
       melovemDates = [...new Set(requestedMelovemDates.map(value => normalizeDate(value, 'Melovem date')))];
       const lastMelovemDate = addUtcDays(injectionDate, 6);
-      if (melovemDates.length !== requestedMelovemDates.length || !melovemDates.includes(injectionDate) || melovemDates.some(date => date < injectionDate || date > lastMelovemDate)) {
+      if (melovemDates.length !== requestedMelovemDates.length || melovemDates.some(date => date < injectionDate || date > lastMelovemDate)) {
         throw Object.assign(new Error('Melovem dates must be unique and within 7 days of the start date'), { status: 400 });
       }
       melovemDates.sort();

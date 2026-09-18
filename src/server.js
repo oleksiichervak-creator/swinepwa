@@ -586,7 +586,7 @@ seekplace.get('/print-card', async (req, res, next) => {
     const medicines = await pool.query(`
       SELECT to_char(i.injection_date,'YYYY-MM-DD') AS injection_date,'Planned' AS treatment_status,m.name AS medicine_name,m.diagnosis,i.dose_ml::float8 AS dose_ml,i.comment,i.id
       FROM planed_sow_injections i JOIN medicine_sow m ON m.id=i.medicine_sow_id
-      WHERE i.sow_number=$1 AND i.injection_date BETWEEN $2::date AND $3::date
+      WHERE i.sow_number=$1
       UNION ALL
       SELECT to_char(i.injection_date,'YYYY-MM-DD'),'Given',m.name,m.diagnosis,i.dose_ml::float8,i.comment,i.id
       FROM done_sow_injections i JOIN medicine_sow m ON m.id=i.medicine_sow_id
@@ -870,17 +870,17 @@ injectionPwa.post('/plans', requireAuth, async (req, res, next) => {
       if (!melovem) throw Object.assign(new Error('Melovem is not available in the medicine list'), { status: 409 });
       medicines.push(melovem);
     }
-    if (requestedMelovemDays !== null && (!Number.isInteger(requestedMelovemDays) || requestedMelovemDays < 1 || requestedMelovemDays > 7)) {
-      throw Object.assign(new Error('Melovem planning days must be from 1 to 7'), { status: 400 });
+    if (requestedMelovemDays !== null && (!Number.isInteger(requestedMelovemDays) || requestedMelovemDays < 0 || requestedMelovemDays > 7)) {
+      throw Object.assign(new Error('Melovem planning days must be from 0 to 7'), { status: 400 });
     }
     let melovemDates;
     if (requestedMelovemDates !== undefined) {
-      if (!Array.isArray(requestedMelovemDates) || requestedMelovemDates.length < 1 || requestedMelovemDates.length > 7) {
-        throw Object.assign(new Error('Select from 1 to 7 Melovem dates'), { status: 400 });
+      if (!Array.isArray(requestedMelovemDates) || requestedMelovemDates.length > 7) {
+        throw Object.assign(new Error('Select from 0 to 7 Melovem dates'), { status: 400 });
       }
       melovemDates = [...new Set(requestedMelovemDates.map(value => normalizeDate(value, 'Melovem date')))];
       const lastMelovemDate = addUtcDays(injectionDate, 6);
-      if (melovemDates.length !== requestedMelovemDates.length || !melovemDates.includes(injectionDate) || melovemDates.some(date => date < injectionDate || date > lastMelovemDate)) {
+      if (melovemDates.length !== requestedMelovemDates.length || melovemDates.some(date => date < injectionDate || date > lastMelovemDate)) {
         throw Object.assign(new Error('Melovem dates must be unique and within 7 days of the start date'), { status: 400 });
       }
       melovemDates.sort();

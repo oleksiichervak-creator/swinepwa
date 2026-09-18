@@ -13,7 +13,7 @@ export function renderSeekplaceCard(record, medicines, period) {
 <button onclick="window.print()">Print</button>
 <main class="sheet"><div class="card"><h1><span><small>Sow number</small>${escape(record.pig_number)}</span><span><small>Group number</small>${escape(record.group_number)}</span></h1>
 <p>Box: ${escape(record.box_number)} · Registration: ${escape(record.registration_date)} · Status: ${escape(record.status)}</p>
-<h2>Medicine — ${escape(period.date_from)} to ${escape(period.date_to)}</h2>
+<h2>Medicine: given ${escape(period.date_from)} to ${escape(period.date_to)}; all planned dates</h2>
 <table class="medicine"><thead><tr><th>Date</th><th>Status</th><th>Medicine</th><th>Diagnosis</th><th>Dose (ml)</th><th>Comment</th></tr></thead><tbody>${medicineRows || '<tr><td colspan="6">No planned or given medicine in this period.</td></tr>'}</tbody></table>
 <h2>Daily inspection — 10 days from registration</h2>
 <table class="inspection"><thead><tr><th>Date</th><th>Comment (fill in by hand)</th></tr></thead><tbody>${days}${extraRows}</tbody></table>
