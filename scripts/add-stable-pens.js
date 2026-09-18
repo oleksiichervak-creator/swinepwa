@@ -13,6 +13,7 @@ const client = await pool.connect();
 try {
   await client.query('BEGIN');
   await client.query('LOCK TABLE rooms IN SHARE MODE');
+  console.log('Existing rooms:', JSON.stringify((await client.query('SELECT r.name,d.name AS department FROM rooms r JOIN departments d ON d.id=r.department_id ORDER BY d.name,r.name')).rows));
   const results = [];
   for (const [name, first, last] of ranges) {
     const rooms = await client.query(`SELECT r.id, r.name, d.name AS department
