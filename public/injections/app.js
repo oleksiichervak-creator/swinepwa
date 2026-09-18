@@ -292,11 +292,6 @@ $('#add-melovem-days').addEventListener('click', () => {
   $('#add-melovem-days').setAttribute('aria-expanded', String(!calendar.hidden));
 });
 $('#melovem-calendar').addEventListener('change', updateDosePreview);
-$('#clear-melovem-days').addEventListener('click', () => {
-  renderMelovemCalendar();
-  document.querySelectorAll('#melovem-calendar input').forEach(input => { input.checked = false; });
-  updateDosePreview();
-});
 
 function updateDosePreview() {
   const form = $('#plan-form');
