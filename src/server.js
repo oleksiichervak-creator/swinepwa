@@ -562,6 +562,18 @@ plannedVaccines.get('/group-print/:year/:group',requireAuth,async(req,res,next)=
 app.use('/api/vaccines',vaccines);app.use('/vaccines',vaccines);
 app.use('/api/vaccination-schedules',vaccinationSchedules);app.use('/vaccination-schedules',vaccinationSchedules);
 app.use('/api/planned-vaccines',plannedVaccines);app.use('/planned-vaccines',plannedVaccines);
+app.get('/api/done-vaccines/week-report-print',requireAuth,async(req,res,next)=>{
+  try{
+    const year=Number(req.query.year),week=Number(req.query.week);
+    if(!Number.isInteger(year)||year<1900||year>9998||!Number.isInteger(week)||week<1||week>53) return res.status(400).json({error:'Select a valid year and week'});
+    const from=isoWeekMonday(year,week),to=addUtcDays(from,6);
+    const items=(await pool.query(`SELECT to_char(d.vaccination_date,'YYYY-MM-DD') AS date,v.name AS vaccine_name,d.group_number,d.recipient,d.pig_count,d.vaccine_used_ml,u.username
+      FROM done_vaccines d JOIN vaccines v ON v.id=d.vaccine_id JOIN users u ON u.id=d.given_by_user_id
+      WHERE d.vaccination_date BETWEEN $1::date AND $2::date ORDER BY d.vaccination_date,d.group_number,v.name,d.id`,[from,to])).rows;
+    const rows=items.map(x=>'<tr>'+[x.date,x.vaccine_name,x.group_number,x.recipient,x.pig_count,formatDose(x.vaccine_used_ml),x.username].map(value=>'<td>'+html(value)+'</td>').join('')+'</tr>').join('');
+    res.set('Cache-Control','no-store').type('html').send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Done vaccines - ${year} week ${week}</title><style>@page{size:A4 landscape;margin:12mm}body{font:13px Arial;color:#111}h1{font-size:22px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #444;padding:7px;text-align:left}th{background:#eee}tr{break-inside:avoid}thead{display:table-header-group}@media print{button{display:none}}</style></head><body><button onclick="print()">Print</button><h1>Done vaccines - week ${week}, ${year}</h1><p>${from} - ${to}</p><table><thead><tr><th>Date</th><th>Vaccine</th><th>Group</th><th>Recipient</th><th>Animals</th><th>Used (ml)</th><th>Given by</th></tr></thead><tbody>${rows||'<tr><td colspan="7">No completed vaccinations for this week.</td></tr>'}</tbody></table></body></html>`);
+  }catch(error){if(error.status)return res.status(error.status).json({error:error.message});next(error);}
+});
 app.use('/api/done-vaccines',doneVaccines);app.use('/done-vaccines',doneVaccines);
 
 const seekplace = express.Router();
@@ -775,9 +787,11 @@ injectionPwa.post('/vaccine-plans/:id/complete', requireAuth, async (req, res, n
       FROM planned_vaccines p JOIN vaccines v ON v.id=p.vaccine_id WHERE p.id=$1 FOR UPDATE OF p`,[req.params.id])).rows[0];
     if(!planned){await client.query('ROLLBACK');return res.status(404).json({error:'Planned vaccination not found'});}
     if(planned.pig_count==null||!planned.vaccination_date)throw Object.assign(new Error('This plan has no animal count or vaccination date'),{status:409});
-    const vaccineUsed=Number((Number(planned.pig_count)*Number(planned.dose_ml)).toFixed(3));
+    const count=req.body?.pig_count === undefined ? Number(planned.pig_count) : req.body.pig_count;
+    if(typeof count !== 'number' || !Number.isInteger(count) || count<0 || count>2147483647)throw Object.assign(new Error('Animal count must be a nonnegative whole number'),{status:400});
+    const vaccineUsed=Number((count*Number(planned.dose_ml)).toFixed(3));
     const inserted=await client.query(`INSERT INTO done_vaccines(vaccine_id,week_number,group_number,recipient,pig_count,vaccine_used_ml,vaccination_date,given_by_user_id)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,[planned.vaccine_id,planned.week_number,planned.group_number,planned.recipient,planned.pig_count,vaccineUsed,planned.vaccination_date,req.user.sub]);
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,[planned.vaccine_id,planned.week_number,planned.group_number,planned.recipient,count,vaccineUsed,planned.vaccination_date,req.user.sub]);
     await client.query('DELETE FROM planned_vaccines WHERE id=$1',[req.params.id]);
     await client.query('COMMIT');
     res.status(201).json({id:inserted.rows[0].id,vaccine_used_ml:vaccineUsed});

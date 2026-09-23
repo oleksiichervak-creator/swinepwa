@@ -496,3 +496,21 @@ function escapeHtml(value) { const div = document.createElement('div'); div.text
 $('#logout').onclick = logout;
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
 if (token) showAdmin();
+
+$('#print-vaccine-week').onclick=()=>{
+ const d=new Date();d.setHours(12,0,0,0);d.setDate(d.getDate()+4-(d.getDay()||7));
+ const year=d.getFullYear(),start=new Date(year,0,1,12),week=Math.ceil((Math.round((d-start)/86400000)+1)/7);
+ const f=$('#vaccine-report-form');f.elements.year.value=year;f.elements.week.value=week;
+ $('#vaccine-report-error').textContent='';$('#vaccine-report-dialog').showModal();
+};
+$('#vaccine-report-cancel').onclick=()=>$('#vaccine-report-dialog').close();
+$('#vaccine-report-form').onsubmit=async event=>{
+ event.preventDefault();const f=event.currentTarget,preview=window.open('','_blank');
+ $('#vaccine-report-error').textContent='';
+ try{
+  if(!preview)throw new Error('Allow pop-ups to open the report.');
+  const response=await fetch('/api/done-vaccines/week-report-print?'+new URLSearchParams({year:f.elements.year.value,week:f.elements.week.value}),{headers:{Authorization:'Bearer '+token}});
+  if(!response.ok){const data=await response.json();throw new Error(data.error||'Report failed');}
+  const url=URL.createObjectURL(await response.blob());preview.location.href=url;setTimeout(()=>URL.revokeObjectURL(url),60000);$('#vaccine-report-dialog').close();
+ }catch(error){if(preview)preview.close();$('#vaccine-report-error').textContent=error.message;}
+};

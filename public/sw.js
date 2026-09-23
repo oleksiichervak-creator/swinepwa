@@ -1,4 +1,4 @@
-const CACHE = 'swine-admin-v45';
+const CACHE = 'swine-admin-v46';
 const ASSETS = ['/', '/styles.css', '/app.js', '/farestald.js', '/farestald-farrowings.js', '/farrowings-data.js', '/manifest.json', '/assets/vaccination/sow-walking.png', '/assets/vaccination/sow-piglets.png'];
 self.addEventListener('install', event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS))));
 self.addEventListener('activate', event => event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('swine-admin-') && key !== CACHE).map(key => caches.delete(key))))));

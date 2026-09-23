@@ -465,18 +465,31 @@ async function loadVaccinesWeek() {
   try{
     const result=await api(`/api/injection-pwa/vaccines-week?date=${localDate()}`);
     $('#vaccines-week-period').textContent=`${result.start_date} — ${result.end_date}`;
-    list.innerHTML=result.items.length?result.items.map(item=>`<article class="injection-card weekly-vaccine-card"><header><div><small class="pen-label">VACCINE</small><h2>${escapeHtml(item.vaccine_name)}</h2></div><strong class="vaccine-group">Group ${escapeHtml(item.group_number)}</strong></header><div class="meta"><span>Date: <strong>${escapeHtml(item.vaccination_date)}</strong></span><span>Week: <strong>${item.week_number}</strong></span><span>Recipient: <strong>${escapeHtml(item.recipient)}</strong></span><span>Animals: <strong>${item.pig_count}</strong></span></div><div class="medicine">Planned use: ${formatDose(Number(item.pig_count)*Number(item.dose_ml))} ml</div><button class="complete-button vaccine-done" type="button" data-id="${item.id}">Done</button></article>`).join(''):'<div class="empty">No vaccinations planned for this week.</div>';
+    list.innerHTML=result.items.length?result.items.map(item=>`<article class="injection-card weekly-vaccine-card" data-dose="${Number(item.dose_ml)}">
+      <header><div><small>GROUP</small><h2 class="vaccine-group-number">${escapeHtml(item.group_number)}</h2></div><strong class="vaccine-recipient">${escapeHtml(item.recipient === 'all' ? 'All sows' : item.recipient === 'polte' ? 'Polte' : item.recipient)}</strong></header>
+      <div class="medicine">${escapeHtml(item.vaccine_name)}</div>
+      <div class="vaccine-quantity"><strong>Animals</strong><div class="stepper"><button type="button" data-count-step="-1" aria-label="Decrease animal count">&minus;</button><output class="vaccine-count">${item.pig_count ?? 0}</output><button type="button" data-count-step="1" aria-label="Increase animal count">+</button></div></div>
+      <p class="vaccine-use">Planned use: <strong>${formatDose(Number(item.pig_count)*Number(item.dose_ml))}</strong> ml</p>
+      <p class="vaccine-date">Date: ${escapeHtml(item.vaccination_date)} &middot; Week ${item.week_number}</p>
+      <button class="complete-button vaccine-done" type="button" data-id="${item.id}">Done</button></article>`).join(''):'<div class="empty">No vaccinations planned for this week.</div>';
+    list.querySelectorAll('[data-count-step]').forEach(button=>button.addEventListener('click',()=>{
+      const card=button.closest('.weekly-vaccine-card'),output=card.querySelector('.vaccine-count');
+      const count=Math.max(0,Math.min(2147483647,Number(output.value)+Number(button.dataset.countStep)));
+      output.value=String(count);
+      card.querySelector('.vaccine-use strong').textContent=formatDose(count*Number(card.dataset.dose));
+    }));
     document.querySelectorAll('.vaccine-done').forEach(button=>button.addEventListener('click',()=>completeVaccinePlan(button)));
   }catch(error){list.innerHTML=`<div class="empty">${escapeHtml(error.message)}</div>`;}
 }
 
 async function completeVaccinePlan(button){
-  button.disabled=true;
+  const card=button.closest('.weekly-vaccine-card');
+  card.querySelectorAll('button').forEach(b=>b.disabled=true);
   try{
-    await api(`/api/injection-pwa/vaccine-plans/${button.dataset.id}/complete`,{method:'POST'});
+    await api(`/api/injection-pwa/vaccine-plans/${button.dataset.id}/complete`,{method:'POST',body:JSON.stringify({pig_count:Number(card.querySelector('.vaccine-count').value)})});
     await loadVaccinesWeek();
     toast('Vaccination registered');
-  }catch(error){button.disabled=false;toast(error.message);}
+  }catch(error){card.querySelectorAll('button').forEach(b=>b.disabled=false);toast(error.message);}
 }
 
 async function loadToday() {

@@ -40,3 +40,5 @@ body:has(#login-view:not([hidden])) main{min-height:100dvh;height:100dvh;padding
  #login-form .error{grid-column:1;grid-row:3}
  #login-form button[type=submit]{grid-column:2;grid-row:3}
 }
+
+.weekly-vaccine-card .vaccine-group-number{font-size:54px;line-height:1.1;color:#245c43;overflow-wrap:anywhere}.vaccine-recipient{font-size:24px;background:#fff0c7;padding:10px;border-radius:12px}.vaccine-quantity{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:16px 0;font-size:20px}.vaccine-quantity .stepper{grid-template-columns:48px minmax(64px,auto) 48px}.vaccine-quantity output{font-size:30px}.vaccine-date{font-size:13px;color:#64766b}
