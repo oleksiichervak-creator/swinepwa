@@ -1,3 +1,4 @@
+import { openSowExport } from './sow-export.js';
 import { setupFarrowings } from './farestald-farrowings.js';
 const field = (key,label,type='text',extra={}) => ({key,label,type,...extra});
 const injection = [field('sow_number','Sow number','text',{max:100}),field('pen_id','Pen','select'),field('injection_date','Date','date'),field('medicine_sow_id','Medicine','select'),field('dose_ml','Dose (ml)','number'),field('weight_kg','Weight (kg)','number',{optional:true,min:1,step:1}),field('comment','Comment','textarea',{optional:true})];
@@ -44,7 +45,7 @@ export function setupFarestald({api,getUser,getToken}) {
     } catch (e) { if (preview) preview.close(); error.textContent = e.message; }
   }
   $('#farestald-report-print').onclick = ()=>reportFile('-print');
-  $('#farestald-report-xlsx').onclick = ()=>reportFile('.xlsx');
+  $('#farestald-report-xlsx').onclick = ()=>openSowExport({base:'/api/farestald/done-sow-injections',token:getToken(),start:$('#farestald-report-date').value});
   document.body.insertAdjacentHTML('beforeend','<dialog id="farestald-dialog"><form id="farestald-form"><h2 id="farestald-title"></h2><div id="farestald-fields"></div><p id="farestald-form-error" class="error" role="alert"></p><div class="actions"><button type="button" class="secondary" id="farestald-cancel">Cancel</button><button type="submit">Save</button></div></form></dialog>');
   const farrowings=setupFarrowings({api,getUser,reload:()=>load(sections.find(s=>s.key==='done-sow-injections'))});
   let editing;

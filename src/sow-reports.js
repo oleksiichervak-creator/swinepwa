@@ -13,7 +13,7 @@ router.get('/week-report', requireAuth, async (req,res,next) => {
 
 router.get('/week-report.xlsx', requireAuth, async (req,res,next) => {
   try {
-    const report=await buildDoneSowWeekReport(req.query.start_date),workbook=new ExcelJS.Workbook(),sheet=workbook.addWorksheet('Sows log import');
+    const report=await buildDoneSowWeekReport(req.query.start_date,req.query.end_date),workbook=new ExcelJS.Workbook(),sheet=workbook.addWorksheet('Sows log import');
     sheet.columns=[{header:'Date',width:13},{header:'Type (Sow/Piglet)',width:19},{header:'Sow ID / Group',width:15},{header:'Diagnosis',width:32},{header:'Quantity',width:10},{header:'Weight (kg)',width:12}];
     const thinBorder={top:{style:'thin'},left:{style:'thin'},bottom:{style:'thin'},right:{style:'thin'}};
     const headerFill={type:'pattern',pattern:'solid',fgColor:{argb:'FFEFEFEF'}};
@@ -48,9 +48,10 @@ router.get('/week-report-print', requireAuth, async (req,res,next) => {
 
 
   return router;
-async function buildDoneSowWeekReport(start){
+async function buildDoneSowWeekReport(start,finish){
   const startDate=normalizeDate(start,'start_date'),end=new Date(`${startDate}T00:00:00Z`);end.setUTCDate(end.getUTCDate()+6);
-  const endDate=end.toISOString().slice(0,10);
+  const endDate=finish === undefined ? end.toISOString().slice(0,10) : normalizeDate(finish,'end_date');
+  if(endDate<startDate)throw Object.assign(new Error('End date must be on or after start date'),{status:400});
   const reportSelect=`SELECT i.sow_number,i.injection_date,i.medicine_sow_id,i.dose_ml::float8 AS dose_ml,i.weight_kg,i.comment,i.id,
     m.name AS medicine_name,m.diagnosis,m.course_days,m.interval_hours,m.dose_ml::float8 AS medicine_dose_ml,
     m.dose_kg::float8 AS dose_kg,p.name AS pen_name,u.username AS given_by_username
@@ -90,7 +91,7 @@ async function buildDoneSowWeekReport(start){
 }
 
 }
-function normalizeDate(value, label='Date') { const date=value instanceof Date?value.toISOString().slice(0,10):String(value||'').slice(0,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||Number.isNaN(Date.parse(`${date}T00:00:00Z`)))throw Object.assign(new Error(`${label} is invalid`),{status:400});return date; }
+function normalizeDate(value, label='Date') { const date=value instanceof Date?value.toISOString().slice(0,10):String(value||'').slice(0,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||Number.isNaN(Date.parse(`${date}T00:00:00Z`))||new Date(`${date}T00:00:00Z`).toISOString().slice(0,10)!==date)throw Object.assign(new Error(`${label} is invalid`),{status:400});return date; }
 function isoWeekNumber(value){const date=new Date(`${value}T00:00:00Z`),day=date.getUTCDay()||7;date.setUTCDate(date.getUTCDate()+4-day);const yearStart=new Date(Date.UTC(date.getUTCFullYear(),0,1));return Math.ceil((((date-yearStart)/86400000)+1)/7);}
 function userInitials(value){const parts=String(value||'').trim().split(/[^\p{L}\p{N}]+/u).filter(Boolean);return parts.map(part=>part[0]).join('').toLocaleUpperCase().slice(0,3);}
 function formatDose(value){return Number(value).toLocaleString('en-GB',{maximumFractionDigits:3});}
