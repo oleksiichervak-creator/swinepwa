@@ -1,4 +1,4 @@
-const CACHE = 'farestald-injections-v5';
+const CACHE = 'farestald-injections-v6';
 const ROOT = '/farestald-injections/';
 const SHELL = [ROOT,...['index.html','styles.css?v=3','app.js?v=3','manifest.json','icon.svg'].map(file=>ROOT+file)];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting())));

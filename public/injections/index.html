@@ -180,7 +180,7 @@
       <label>Registration date<input name="registration_date" type="date" required></label>
       <label>Pig number<input name="pig_number" required maxlength="100" inputmode="numeric"></label>
       <label>Group number<input name="group_number" required maxlength="150" inputmode="numeric"></label>
-      <label>Status<select name="status" required><option value="observation">observation</option><option value="recovered">recovered</option></select></label>
+      <input type="hidden" name="status" value="observation">
       <p id="sickplace-form-error" class="error" role="alert"></p>
       <button type="submit">Save pig</button>
     </form>

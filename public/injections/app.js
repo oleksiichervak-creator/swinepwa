@@ -328,28 +328,16 @@ async function loadSickplace() {
 
 function renderSickplace() {
   const search = $('#sickplace-search').value.trim().toLowerCase();
-  const items = sickplaceItems.filter(item => item.pig_number.toLowerCase().includes(search));
+  const now = new Date();
+  const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+  const cutoff = new Date(today); cutoff.setUTCDate(cutoff.getUTCDate() - 9);
+  const from = cutoff.toISOString().slice(0,10), to = today.toISOString().slice(0,10);
+  const items = sickplaceItems.filter(item => item.registration_date >= from && item.registration_date <= to && item.pig_number.toLowerCase().includes(search))
+    .sort((a,b) => String(a.box_number).localeCompare(String(b.box_number), undefined, {numeric:true}) || String(a.pig_number).localeCompare(String(b.pig_number), undefined, {numeric:true}));
   $('#sickplace-list').innerHTML = items.length ? items.map(item => `<article class="injection-card">
-    <header><h2>Pig ${escapeHtml(item.pig_number)}</h2><strong>Group ${escapeHtml(item.group_number)}</strong></header>
-    <div class="meta"><span>Box: ${escapeHtml(item.box_number)}</span><span>Registered: ${escapeHtml(item.registration_date)}</span></div>
-    <form class="sickplace-status-form" data-id="${item.id}">
-      <label>Status<select name="status"><option value="observation" ${item.status === 'observation' ? 'selected' : ''}>observation</option><option value="recovered" ${item.status === 'recovered' ? 'selected' : ''}>recovered</option></select></label>
-      <p class="error" role="alert"></p><button type="submit">Save status</button>
-    </form></article>`).join('') : `<p class="empty">${search ? 'No pigs match this number.' : 'No pigs registered yet.'}</p>`;
-  document.querySelectorAll('.sickplace-status-form').forEach(form => form.addEventListener('submit', async event => {
-    event.preventDefault();
-    const button = form.querySelector('button');
-    const select = form.elements.status;
-    button.disabled = true;
-    select.disabled = true;
-    form.querySelector('.error').textContent = '';
-    try {
-      const updated = await api(`/api/injection-pwa/sickplace/${form.dataset.id}/status`, { method: 'PATCH', body: JSON.stringify({ status: select.value }) });
-      sickplaceItems = sickplaceItems.map(item => item.id === updated.id ? updated : item);
-      toast('Status saved');
-    } catch (error) { form.querySelector('.error').textContent = error.message; }
-    finally { button.disabled = false; select.disabled = false; }
-  }));
+    <header><h2>Box ${escapeHtml(item.box_number)}</h2><strong>Pig ${escapeHtml(item.pig_number)}</strong></header>
+    <div class="meta"><span>Group: ${escapeHtml(item.group_number)}</span><span>Registered: ${escapeHtml(item.registration_date)}</span></div>
+    <p>Status: ${escapeHtml(item.status)}</p></article>`).join('') : '<p class="empty">No matching pigs registered in the last 10 days.</p>';
 }
 
 $('#show-sickplace').addEventListener('click', () => {

@@ -698,16 +698,6 @@ app.use('/planed-sow-injections', sowInjections);
 
 const injectionPwa = express.Router();
 injectionPwa.post('/sickplace', requireAuth, createSickplace);
-injectionPwa.patch('/sickplace/:id/status', requireAuth, async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    if (!/^[1-9]\d*$/.test(id) || BigInt(id) > 9223372036854775807n) return res.status(400).json({ error: 'Invalid record ID' });
-    if (!req.body || Object.keys(req.body).length !== 1 || !['observation', 'recovered'].includes(req.body.status)) return res.status(400).json({ error: 'Provide only status: observation or recovered' });
-    const result = await pool.query(`UPDATE seekplace SET status=$1,updated_at=NOW() WHERE id=$2 RETURNING ${seekplaceColumns}`, [req.body.status, id]);
-    if (!result.rowCount) return res.status(404).json({ error: 'Sickplace record not found' });
-    res.json(result.rows[0]);
-  } catch (error) { handleDbError(error, res, next); }
-});
 injectionPwa.get('/history', requireAuth, async (req, res, next) => {
   try {
     const sowNumber = String(req.query.sow_number || '').trim();
