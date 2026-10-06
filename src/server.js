@@ -1,3 +1,4 @@
+import { createPlanCorrections } from './plan-corrections.js';
 import { DEPARTMENT_ACCESS, validateDepartmentAccess, canAccessDepartment } from './department-access.js';
 import express from 'express';
 import { createFarestaldRouter } from './farestald.js';
@@ -709,6 +710,7 @@ app.use('/api/planed-sow-injections', sowInjections);
 app.use('/planed-sow-injections', sowInjections);
 
 const injectionPwa = express.Router();
+injectionPwa.use('/plan-corrections',createPlanCorrections(pool,'lobe_dragte'));
 injectionPwa.post('/sickplace', requireAuth, createSickplace);
 injectionPwa.get('/history', requireAuth, async (req, res, next) => {
   try {

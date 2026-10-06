@@ -1,3 +1,4 @@
+import { setupPlanCorrections } from '/plan-corrections.js';
 const $ = selector => document.querySelector(selector);
 const localDate = () => {
   const now = new Date();
@@ -560,3 +561,5 @@ if ('serviceWorker' in navigator) {
     .catch(() => {});
 }
 restoreSession();
+
+setupPlanCorrections({api,base:'/api/farestald/mobile/plan-corrections'});

@@ -1,3 +1,4 @@
+import { createPlanCorrections } from './plan-corrections.js';
 import express from 'express';
 
 const invalid = message => { throw Object.assign(new Error(message), {status:400}); };
@@ -8,6 +9,7 @@ export function createFarestaldMobileRouter(pool, validateFarestald) {
   const addUtcDays = (value,days) => {const date=new Date(value+'T00:00:00Z');date.setUTCDate(date.getUTCDate()+days);return date.toISOString().slice(0,10);};
   // Mounted under the authenticated Farestald router; farm workers may plan and complete treatments.
   const router = express.Router();
+  router.use('/plan-corrections',createPlanCorrections(pool,'farestald'));
   const handleError = (error,res,next) => {
     if (error.status) return res.status(error.status).json({error:error.message});
     if (error.code === '23503') return res.status(409).json({error:'A referenced Farestald medicine, pen or user is no longer available'});

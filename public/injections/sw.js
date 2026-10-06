@@ -1,5 +1,5 @@
-const CACHE = 'sow-injections-v24';
-const SHELL = [
+const CACHE = 'sow-injections-v25';
+const SHELL = ['/plan-corrections.js',
   '/injections/',
   '/injections/index.html',
   '/injections/styles.css?v=20',
