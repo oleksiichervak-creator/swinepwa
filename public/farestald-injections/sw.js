@@ -1,4 +1,4 @@
-const CACHE = 'farestald-injections-v7';
+const CACHE = 'farestald-injections-v8';
 const ROOT = '/farestald-injections/';
 const SHELL = ['/plan-corrections.js',ROOT,...['index.html','styles.css?v=3','app.js?v=3','manifest.json','icon.svg'].map(file=>ROOT+file)];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting())));

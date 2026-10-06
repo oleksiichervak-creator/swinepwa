@@ -5,14 +5,28 @@ export function setupPlanCorrections({api,base}) {
   dialog.innerHTML='<form><h2>Edit planned injections</h2><label>Current sow number<input name="search" required maxlength="100" inputmode="numeric"></label><button type="submit">Find plans</button></form><div class="correction-result"></div><p class="error" role="alert"></p><button type="button" class="text-button correction-close">Close</button>';
   dialog.style.padding='18px';document.body.append(dialog);
   const search=dialog.querySelector('form'),result=dialog.querySelector('.correction-result'),error=dialog.querySelector('.error');
+  const choices=document.createElement('div');
+  choices.style.cssText='display:grid;gap:8px;max-height:240px;overflow:auto;margin-bottom:14px';
+  search.after(choices);
+  let sows=[];
+  const renderChoices=()=>{
+    const query=search.elements.search.value.trim().toLowerCase();
+    const filtered=sows.filter(x=>x.sow_number.toLowerCase().includes(query));
+    choices.innerHTML=filtered.length?filtered.map(x=>`<button type="button" class="secondary" style="padding:12px;text-align:left;border:1px solid #c8d8ce;border-radius:12px;background:#eef5f0" data-sow="${escape(x.sow_number)}"><strong style="font-size:22px">${escape(x.sow_number)}</strong><br>Pen: ${escape(x.pens.join(', '))} · ${x.plan_count} planned injections</button>`).join(''):'<p>No matching sows with planned injections.</p>';
+    choices.querySelectorAll('[data-sow]').forEach(button=>button.onclick=()=>{search.elements.search.value=button.dataset.sow;search.requestSubmit();});
+  };
   let sequence=0;
   dialog.querySelector('.correction-close').onclick=()=>dialog.close();
   dialog.onclose=()=>{sequence++;};
   document.querySelector('#logout-button').addEventListener('click',()=>dialog.close());
-  document.querySelector('#edit-plans').onclick=()=>{sequence++;search.reset();result.innerHTML='';error.textContent='';dialog.showModal();};
-  search.elements.search.oninput=()=>{sequence++;result.innerHTML='';};
+  document.querySelector('#edit-plans').onclick=async()=>{
+    const request=++sequence;search.reset();sows=[];result.innerHTML='';error.textContent='';choices.hidden=false;choices.textContent='Loading sows...';dialog.showModal();
+    try{sows=await api(base+'/sows');if(request===sequence)renderChoices();}
+    catch(e){if(request===sequence){choices.textContent='';error.textContent=e.message;}}
+  };
+  search.elements.search.oninput=()=>{sequence++;result.innerHTML='';choices.hidden=false;renderChoices();};
   search.onsubmit=async event=>{
-    event.preventDefault();const request=++sequence,sow=search.elements.search.value.trim();result.innerHTML='';error.textContent='';
+    event.preventDefault();const request=++sequence,sow=search.elements.search.value.trim();result.innerHTML='';error.textContent='';choices.hidden=true;
     try{
       const data=await api(base+'?'+new URLSearchParams({sow_number:sow}));if(request!==sequence)return;
       if(!data.items.length){result.textContent='No planned injections for this sow.';return;}

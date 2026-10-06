@@ -8,6 +8,14 @@ export function createPlanCorrections(pool, department) {
   router.use(requireAuth);
   const pens=`SELECT p.id,p.name,r.name AS room_name FROM pens p JOIN rooms r ON r.id=p.room_id JOIN departments d ON d.id=r.department_id WHERE lower(trim(d.name)) ${prefix?'=':'<>'} 'farestald'`;
   const validSow=value=>typeof value==='string' && value.trim().length>0 && value.trim().length<=100;
+  router.get('/sows',async(_req,res,next)=>{
+    try{
+      const items=(await pool.query(`SELECT i.sow_number,count(*)::integer AS plan_count,array_agg(DISTINCT p.name ORDER BY p.name) AS pens
+        FROM ${table} i JOIN pens p ON p.id=i.pen_id GROUP BY i.sow_number`)).rows;
+      items.sort((a,b)=>a.sow_number.localeCompare(b.sow_number,undefined,{numeric:true}));
+      res.set('Cache-Control','no-store').json(items);
+    }catch(e){next(e);}
+  });
   router.get('/',async(req,res,next)=>{
     try {
       if(!validSow(req.query.sow_number))return res.status(400).json({error:'Enter the current sow number'});
