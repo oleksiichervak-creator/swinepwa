@@ -1,3 +1,26 @@
 .shoulder{max-width:1100px;margin:auto}.shoulder-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0}.shoulder-toolbar h2{margin:0;flex:1}.shoulder-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}.shoulder-pig{display:grid;gap:8px;text-align:left;padding:18px;border:1px solid #c8d8ce;background:#f4f8f5;color:#173f2e;border-radius:14px}.shoulder-pig strong{font-size:26px}.shoulder-tabs{display:flex;gap:10px;margin:15px 0}.shoulder-tabs button{flex:1}.shoulder-tabs [aria-pressed=true]{background:#245c43;color:white}.shoulder-photos{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}.shoulder-photos article,.shoulder-assessment{background:white;border:1px solid #cedbd2;border-radius:14px;padding:14px;margin-bottom:10px;overflow-wrap:anywhere}.shoulder-photos img{width:100%;height:240px;object-fit:contain;background:#edf2ee;cursor:zoom-in}.shoulder-photos p,.shoulder-assessment p{white-space:pre-wrap}.shoulder-dialog{width:min(580px,calc(100% - 20px));max-height:90dvh;overflow:auto;padding:18px;border:0;border-radius:18px}.shoulder-dialog form{padding:0}.shoulder-dialog label,.shoulder label{display:grid;gap:6px;margin:12px 0}.shoulder button,.shoulder-dialog button{padding:11px 15px;border-radius:10px;border:1px solid #b8cdbf;cursor:pointer}.shoulder-dialog input,.shoulder-dialog select,.shoulder-dialog textarea{width:100%;padding:10px;font:inherit}.shoulder-dialog textarea{min-height:80px}.shoulder-dialog::backdrop{background:#10201999}
 
 .shoulder-condition{padding:14px;border:1px solid #a6c8b4;border-left:6px solid #348958;border-radius:12px;margin:12px 0;background:#f0f8f3}.shoulder-condition.yellow{border-color:#c69e00;background:#fff9db}.shoulder-condition.orange{border-color:#d67913;background:#fff0df}.shoulder-condition.red{border-color:#b52b2b;background:#fff0f0}.condition-urgent{font-weight:900;color:#a71919}
+.shoulder-detail-active>.shoulder-toolbar{display:none}
+.shoulder-fixed-head{position:sticky;top:0;z-index:15;background:#f5f8f6;padding:12px 0 0;border-bottom:1px solid #b9c9bf}
+.shoulder-heading{display:flex;align-items:center;gap:16px;padding:0 4px 12px}
+.shoulder-heading small,.shoulder-location small{display:block;font-size:10px;letter-spacing:.12em;font-weight:800;color:#64796c}
+.shoulder-heading h2{font-size:38px;line-height:1.1;margin:3px 0 0;font-weight:850;color:#173f2e;overflow-wrap:anywhere}
+.shoulder .shoulder-back{width:44px;height:44px;flex:0 0 44px;padding:0;border-radius:4px;background:white;color:#245c43;font-size:27px}
+.shoulder-fixed-head .shoulder-tabs{display:grid;grid-template-columns:1fr 1fr;gap:0;margin:0}
+.shoulder-fixed-head .shoulder-tabs button{min-height:48px;border-radius:0;border-bottom:0;font-weight:750;font-size:15px}
+.shoulder-detail-body{display:grid;gap:18px;padding:16px 0 28px}
+.shoulder-location{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px;background:#e8efea;border:1px solid #c8d5cc}
+.shoulder-location strong{display:block;margin-top:5px;font-size:17px;overflow-wrap:anywhere}
+.shoulder-location>span{font-size:12px;font-weight:750;color:#245c43}
+.shoulder-section{display:grid;gap:12px;padding:16px;border:1px solid #c8d5cc;background:white;min-width:0}
+.shoulder-section-heading h3{margin:0;font-size:19px;color:#193d2c}
+.shoulder-section-heading p{margin:5px 0 0;font-size:12px;color:#65786b}
+.shoulder .shoulder-primary{display:block;width:100%;min-height:46px;border-radius:3px;background:#245c43;color:white;font-weight:750;border-color:#245c43}
+.shoulder-detail-active .shoulder-photos{grid-template-columns:minmax(0,1fr);gap:12px}
+.shoulder-detail-active .shoulder-photos article,.shoulder-detail-active .shoulder-assessment{border-radius:3px;margin:0;padding:12px;box-shadow:none}
+.shoulder-detail-active .shoulder-photos img{height:auto;max-height:420px;min-height:120px;display:block;margin-bottom:12px}
+.shoulder-empty{margin:0;padding:16px 0;font-size:13px;color:#64796c;border-top:1px solid #e0e8e2}
+#app-view:has(#shoulder-screen.shoulder-detail-active)>header,#app-view:has(#shoulder-screen.shoulder-detail-active)>#current-user{display:none}
+body:has(#shoulder-screen.shoulder-detail-active) #install-app,body:has(#shoulder-screen.shoulder-detail-active) #connection-note:empty{display:none}
+@media(max-width:600px){.shoulder-fixed-head{padding-top:max(10px,env(safe-area-inset-top))}.shoulder-section{padding:14px}.shoulder-heading h2{font-size:34px}}
