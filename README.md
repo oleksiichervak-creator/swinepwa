@@ -142,3 +142,11 @@ Create these GitHub Environment secrets under `production`:
 - `ADMIN_PASSWORD` — initial Oleksii password for a fresh database
 
 The app binds only to `127.0.0.1:3000`; the server's Nginx terminates HTTPS and proxies the public domain to that port. Open TCP ports 22, 80, and 443.
+
+## Farestald Shoulder
+
+The website and Farestald mobile app share the Shoulder screen. Users with Farestald access can register sows, update their current pen, add left/right shoulder photos and append condition/treatment assessments. Closing observation preserves all history. Treatments are descriptive records and do not schedule injections.
+
+Startup creates shoulder_pigs, shoulder_photos and shoulder_assessments. Relations use stable pig IDs; renaming a sow preserves history. Each photo stores the pen ID and room/pen label at upload time. Multiple photos per side/day are allowed. Assessments may reference a photo belonging to the same pig and side.
+
+Photos are compressed in the browser to JPEG with a maximum 2000-pixel edge, uploaded with an 8 MB server limit, and stored under /app/files/shoulder in the existing persistent files_data volume. Photo downloads require Farestald authorization. Backups must include the PostgreSQL database and the files_data volume together; persistent storage itself is not a backup.

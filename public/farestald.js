@@ -1,3 +1,4 @@
+import { setupShoulder } from './shoulder.js';
 import { openSowExport } from './sow-export.js';
 import { setupFarrowings } from './farestald-farrowings.js';
 const field = (key,label,type='text',extra={}) => ({key,label,type,...extra});
@@ -14,6 +15,9 @@ export function setupFarestald({api,getUser,getToken}) {
   const $ = selector => document.querySelector(selector);
   const nav = $('#farestald-navigation');
   nav.innerHTML = ['Medicine','Sow injections'].map(group=>`<details class="nav-group"><summary>${group}</summary><div class="nav-group-items" role="group" aria-label="Farestald ${group}">${sections.filter(s=>s.group===group).map(s=>`<button class="nav-button" role="tab" aria-selected="false" aria-controls="farestald-${s.key}-page" data-page="farestald-${s.key}">${s.title}<span class="count" id="farestald-${s.key}-count">0</span></button>`).join('')}</div></details>`).join('');
+  nav.insertAdjacentHTML('beforeend','<button class="nav-button" role="tab" aria-selected="false" aria-controls="farestald-shoulder-page" data-page="farestald-shoulder">Shoulder</button>');
+  $('#admin').insertAdjacentHTML('beforeend','<section id="farestald-shoulder-page" role="tabpanel" hidden></section>');
+  const shoulder=setupShoulder($('#farestald-shoulder-page'),getToken);
   const caches = new Map();
   for (const section of sections) {
     const prefix = `farestald-${section.key}`;
@@ -112,7 +116,8 @@ export function setupFarestald({api,getUser,getToken}) {
     finally { button.disabled=false; }
   };
   return {
-    pages: sections.map(s=>'farestald-'+s.key),
-    load: () => Promise.all(sections.map(load)),
+    pages: [...sections.map(s=>'farestald-'+s.key),'farestald-shoulder'],
+    reset: shoulder.reset,
+    load: () => Promise.all([...sections.map(load),shoulder.load()]),
   };
 }

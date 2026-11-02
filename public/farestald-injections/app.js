@@ -1,3 +1,4 @@
+import { setupShoulder } from '/shoulder.js';
 import { setupPlanCorrections } from '/plan-corrections.js';
 const $ = selector => document.querySelector(selector);
 const localDate = () => {
@@ -101,6 +102,7 @@ async function enterApp() {
 }
 
 function signOut() {
+  shoulder.reset();
   token = '';
   currentUser = null;
   references = null;
@@ -111,7 +113,7 @@ function signOut() {
 }
 
 function showScreen(name) {
-  for (const screen of ['home', 'plan', 'today']) $(`#${screen}-screen`).hidden = screen !== name;
+  for (const screen of ['home', 'plan', 'today', 'shoulder']) $(`#${screen}-screen`).hidden = screen !== name;
   $('#back-button').hidden = name === 'home';
   $('#screen-title').textContent = '';
   $('#logout-button').hidden = name !== 'home';
@@ -560,6 +562,10 @@ if ('serviceWorker' in navigator) {
     .then(registration => registration.update())
     .catch(() => {});
 }
+document.querySelector('#home-screen .choice-grid').insertAdjacentHTML('beforeend','<button id="show-shoulder" class="choice-card accent" type="button"><span class="choice-icon">S</span><span><strong>Shoulder</strong><small>Photos, condition and treatment history</small></span></button>');
+$('#app-view').insertAdjacentHTML('beforeend','<section id="shoulder-screen" class="screen" hidden></section>');
+const shoulder=setupShoulder($('#shoulder-screen'),()=>token);
+$('#show-shoulder').onclick=()=>{showScreen('shoulder');shoulder.load();};
 restoreSession();
 
 setupPlanCorrections({api,base:'/api/farestald/mobile/plan-corrections'});

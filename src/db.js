@@ -1,3 +1,4 @@
+import { initializeShoulder } from './shoulder.js';
 import { initializeFarestald } from './farestald-db.js';
 import pg from 'pg';
 import bcrypt from 'bcryptjs';
@@ -384,6 +385,7 @@ export async function initializeDatabase() {
     ON planed_sow_injections(source_system, source_record_id) WHERE source_system IS NOT NULL`);
 
   await initializeFarestald(pool);
+  await initializeShoulder(pool);
 
   const exists = await pool.query('SELECT id FROM users WHERE username = $1', ['Oleksii']);
   if (exists.rowCount === 0) {

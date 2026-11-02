@@ -492,7 +492,7 @@ async function openDoneVaccine(item={}){const f=$('#done-vaccine-form');f.reset(
 async function deleteDoneVaccine(id){if(confirm('Delete this completed vaccination?')){try{await api(`/done-vaccines/${id}`,{method:'DELETE'});await loadDoneVaccines();}catch(error){alert(error.message);}}}
 $('#add-done-vaccine').onclick=()=>openDoneVaccine();$('#done-vaccine-cancel').onclick=()=>$('#done-vaccine-dialog').close();$('#done-vaccine-form').onsubmit=async event=>{event.preventDefault();const f=event.currentTarget,id=f.elements.id.value,data={vaccine_id:Number(f.vaccine_id.value),week_number:Number(f.week_number.value),group_number:f.group_number.value,recipient:f.recipient.value,pig_count:Number(f.pig_count.value),vaccine_used_ml:Number(f.vaccine_used_ml.value),vaccination_date:f.vaccination_date.value,given_by_user_id:Number(f.given_by_user_id.value)};$('#done-vaccine-error').textContent='';try{await api(id?`/done-vaccines/${id}`:'/done-vaccines/',{method:id?'PATCH':'POST',body:JSON.stringify(data)});$('#done-vaccine-dialog').close();await loadDoneVaccines();}catch(error){$('#done-vaccine-error').textContent=error.message;}};
 
-function logout() { token = null; me = null; localStorage.removeItem('token'); $('#admin').hidden = true; $('#login').hidden = false; }
+function logout() { farestald.reset(); token = null; me = null; localStorage.removeItem('token'); $('#admin').hidden = true; $('#login').hidden = false; }
 function escapeHtml(value) { const div = document.createElement('div'); div.textContent = value; return div.innerHTML; }
 $('#logout').onclick = logout;
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');

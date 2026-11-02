@@ -1,3 +1,4 @@
+import { createShoulderRouter } from './shoulder.js';
 import express from 'express';
 import { createSowReportsRouter } from './sow-reports.js';
 import { requireAuth, requireAdmin } from './auth.js';
@@ -43,6 +44,7 @@ export function validateFarestald(resource, body = {}) {
 export function createFarestaldRouter(pool) {
   const router = express.Router();
   router.use(requireAuth);
+  router.use('/shoulder',createShoulderRouter(pool));
   router.use('/done-sow-injections', createSowReportsRouter(pool, 'farestald'));
   router.use('/mobile', createFarestaldMobileRouter(pool, validateFarestald));
   router.use('/farrowings', createFarrowingsRouter(pool, validateFarestald));
