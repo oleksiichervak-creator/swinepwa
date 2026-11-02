@@ -33,10 +33,23 @@ export function setupShoulder(root,getToken,options={}) {
     dialog.showModal();return form;
   }
   function editPig(pig,locationOnly=false){
-    modal(locationOnly?'Change location':pig?'Sow details':'Add sow',`<label ${locationOnly?'hidden':''}>Sow number<input name="sow_number" required maxlength="100" inputmode="numeric" value="${esc(pig?.sow_number)}"></label><label>Current pen<select name="pen_id" required>${penOptions(pig?.pen_id)}</select></label>${pig?`<label ${locationOnly?'hidden':''}>Observation<select name="active"><option value="true" ${pig.active?'selected':''}>Active</option><option value="false" ${!pig.active?'selected':''}>Closed</option></select></label>`:''}`,async form=>{
+    const form=modal(locationOnly?'Change location':pig?'Sow details':'Add sow',`<label ${locationOnly?'hidden':''}>Sow number<input name="sow_number" required maxlength="100" inputmode="numeric" value="${esc(pig?.sow_number)}"><small data-sow-check aria-live="polite"></small></label>${pig?`<label>Current pen<select name="pen_id" required>${penOptions(pig.pen_id)}</select></label>`:'<label>Pen number<input name="pen_number" required maxlength="150" inputmode="numeric" autocomplete="off" placeholder="Enter pen number"><small data-pen-check aria-live="polite"></small></label>'}${pig?`<label ${locationOnly?'hidden':''}>Observation<select name="active"><option value="true" ${pig.active?'selected':''}>Active</option><option value="false" ${!pig.active?'selected':''}>Closed</option></select></label>`:''}`,async form=>{
       const data=Object.fromEntries(new FormData(form));if(pig)data.active=data.active==='true';
       const saved=await request('/pigs'+(pig?'/'+pig.id:''),{method:pig?'PATCH':'POST',body:JSON.stringify(data)});await load();await openPig(saved.id);
     });
+    const validateSow=()=>{
+      const value=form.elements.sow_number.value.trim();
+      const existing=pigs.find(p=>p.sow_number===value&&String(p.id)!==String(pig?.id));
+      const message=existing?'This sow is already registered'+(existing.active?'. Open its existing card.':' with a closed observation. Open its existing card to reopen it.') : '';
+      form.elements.sow_number.setCustomValidity(message);form.querySelector('[data-sow-check]').textContent=message;
+    };
+    form.elements.sow_number.oninput=validateSow;
+    if(!pig)form.elements.pen_number.oninput=()=>{
+      const value=form.elements.pen_number.value.trim(),matches=pens.filter(p=>p.name.trim()===value);
+      const message=!value?'':matches.length===0?'This pen does not exist in Farestald.':matches.length>1?'This pen number exists in multiple rooms. Give pens unique numbers in Farm first.':'';
+      form.elements.pen_number.setCustomValidity(message);
+      form.querySelector('[data-pen-check]').textContent=message||(matches.length===1?'Found: '+matches[0].room_name+' / '+matches[0].name:'');
+    };
   }
   const observationFields=()=>`<label>Side<select name="shoulder_side"><option value="left" ${side==='left'?'selected':''}>Left</option><option value="right" ${side==='right'?'selected':''}>Right</option></select></label><label>Observation date<input type="date" name="observed_date" required value="${today()}"></label>`;
   function renderDetail(){

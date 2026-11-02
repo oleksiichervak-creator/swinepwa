@@ -65,8 +65,15 @@ export function createShoulderRouter(pool) {
     try{res.set('Cache-Control','no-store').json((await pool.query(`${pigSelect.replace('s.*,','s.*,(SELECT to_char(max(observed_date),\'YYYY-MM-DD\') FROM shoulder_photos WHERE pig_id=s.id) AS last_photo_date,')} ORDER BY s.active DESC,s.sow_number`)).rows);}catch(e){next(e);}
   });
   router.post('/pigs',async(req,res,next)=>{
-    try{const sow=text(req.body.sow_number,100);await validPen(pool,req.body.pen_id);
-      const row=(await pool.query('INSERT INTO shoulder_pigs(sow_number,pen_id,created_by_user_id) VALUES($1,$2,$3) RETURNING *',[sow,req.body.pen_id,req.user.id])).rows[0];res.status(201).json(row);
+    try{const sow=text(req.body.sow_number,100);let penId=req.body.pen_id;
+      if(req.body.pen_number!==undefined){
+        const number=text(req.body.pen_number,150),matches=(await pool.query(pens+' AND trim(p.name)=$1',[number])).rows;
+        if(!matches.length)fail('This pen does not exist in Farestald.');
+        if(matches.length>1)fail('This pen number exists in multiple rooms. Give pens unique numbers in Farm first.');
+        penId=matches[0].id;
+      }
+      await validPen(pool,penId);
+      const row=(await pool.query('INSERT INTO shoulder_pigs(sow_number,pen_id,created_by_user_id) VALUES($1,$2,$3) RETURNING *',[sow,penId,req.user.id])).rows[0];res.status(201).json(row);
     }catch(e){next(e);}
   });
   router.patch('/pigs/:id',async(req,res,next)=>{
