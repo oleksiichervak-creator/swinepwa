@@ -26,9 +26,9 @@ export function setupShoulder(root,getToken,options={}) {
     const version=++generation;error.textContent='';revoke();
     try{const data=await request('/pigs/'+id);if(version!==generation)return;selected=data;$('[data-list]').hidden=true;$('[data-detail]').hidden=false;renderDetail();}catch(e){error.textContent=e.message;}
   }
-  function modal(title,fields,onSave){
-    const dialog=document.createElement('dialog');dialog.className='shoulder-dialog';dialog.innerHTML=`<form><h2>${title}</h2>${fields}<p class="error" role="alert"></p><div class="shoulder-toolbar"><button type="button" class="secondary">Cancel</button><button type="submit">Save</button></div></form>`;document.body.append(dialog);
-    const form=dialog.querySelector('form');dialog.querySelector('[type=button]').onclick=()=>dialog.close();dialog.onclose=()=>dialog.remove();
+  function modal(title,fields,onSave,showCancel=true){
+    const dialog=document.createElement('dialog');dialog.className='shoulder-dialog';dialog.innerHTML=`<form><h2>${title}</h2>${fields}<p class="error" role="alert"></p><div class="shoulder-toolbar">${showCancel?'<button type="button" class="secondary">Cancel</button>':''}<button type="submit">Save</button></div></form>`;document.body.append(dialog);
+    const form=dialog.querySelector('form');const cancel=dialog.querySelector('[type=button]');if(cancel)cancel.onclick=()=>dialog.close();dialog.onclose=()=>dialog.remove();
     form.onsubmit=async event=>{event.preventDefault();const button=form.querySelector('[type=submit]');button.disabled=true;form.querySelector('.error').textContent='';try{await onSave(form);dialog.close();}catch(e){form.querySelector('.error').textContent=e.message;}finally{button.disabled=false;}};
     dialog.showModal();return form;
   }
@@ -51,17 +51,17 @@ export function setupShoulder(root,getToken,options={}) {
       form.querySelector('[data-pen-check]').textContent=message||(matches.length===1?'Found: '+matches[0].room_name+' / '+matches[0].name:'');
     };
   }
-  const observationFields=()=>`<label>Side<select name="shoulder_side"><option value="left" ${side==='left'?'selected':''}>Left</option><option value="right" ${side==='right'?'selected':''}>Right</option></select></label><label>Observation date<input type="date" name="observed_date" required value="${today()}"></label>`;
+  const observationFields=()=>`<label>Side<select name="shoulder_side"><option value="left" ${side==='left'?'selected':''}>Left</option><option value="right" ${side==='right'?'selected':''}>Right</option></select></label>`;
   function renderDetail(){
     revoke();const {pig,photos,assessments}=selected,visible=photos.filter(x=>x.shoulder_side===side),history=assessments.filter(x=>x.shoulder_side===side);
     const detail=$('[data-detail]');root.classList.add('shoulder-detail-active');
     detail.innerHTML=`<div class="shoulder-fixed-head"><div class="shoulder-heading"><button class="shoulder-back" data-back aria-label="Back to sow list">&larr;</button><div><small>SOW NUMBER</small><h2>${esc(pig.sow_number)}</h2></div></div><div class="shoulder-tabs"><button data-side="left" aria-pressed="${side==='left'}">Left shoulder</button><button data-side="right" aria-pressed="${side==='right'}">Right shoulder</button></div></div>
     <div class="shoulder-detail-body"><div class="shoulder-location"><div><small>CURRENT PEN</small><strong>${esc(pig.room_name)} / ${esc(pig.pen_name)}</strong></div><span>${pig.active?'Active':'Closed'}</span></div>
-    <section class="shoulder-section"><div class="shoulder-section-heading"><h3>Photos</h3><p>${visible.some(x=>x.observed_date===today())?'Photo added today':'No photo today for this shoulder'}</p></div>${pig.active?'<button class="shoulder-primary" data-photo>Add photo</button>':''}<div class="shoulder-photos">${visible.map(x=>`<article><img data-photo-id="${x.id}" alt="${esc(x.shoulder_side)} shoulder, ${esc(x.observed_date)}" loading="lazy"><strong>${esc(x.observed_date)}</strong><p>Pen at capture: ${esc(x.pen_label)}</p>${x.comment?'<p>'+esc(x.comment)+'</p>':''}<small>${esc(x.created_by)}</small></article>`).join('')||'<p class="shoulder-empty">No photos for this shoulder.</p>'}</div></section>
+    <section class="shoulder-section"><div class="shoulder-section-heading"><h3>Photos</h3><p>${visible.some(x=>x.observed_date===today())?'Photo added today':'No photo today for this shoulder'}</p></div>${pig.active?'<button class="shoulder-primary" data-photo>Take a photo</button>':''}<div class="shoulder-photos">${visible.map(x=>`<article><img data-photo-id="${x.id}" alt="${esc(x.shoulder_side)} shoulder, ${esc(x.observed_date)}" loading="lazy"><strong>${esc(x.observed_date)}</strong><p>Pen at capture: ${esc(x.pen_label)}</p>${x.comment?'<p>'+esc(x.comment)+'</p>':''}<small>${esc(x.created_by)}</small></article>`).join('')||'<p class="shoulder-empty">No photos for this shoulder.</p>'}</div></section>
     <section class="shoulder-section"><div class="shoulder-section-heading"><h3>Condition &amp; treatment</h3><p>Assessment history for this shoulder</p></div>${pig.active?'<button class="shoulder-primary" data-assess>Add assessment</button>':''}${history.map(x=>`<article class="shoulder-assessment"><strong>${esc(x.observed_date)}</strong><p><b>Condition:</b> ${esc(x.condition)}</p><p><b>Selected treatment:</b> ${esc(x.treatment)}</p>${x.comment?'<p>'+esc(x.comment)+'</p>':''}${x.photo_id?`<small>Photo #${x.photo_id} &middot; </small>`:''}<small>${esc(x.created_by)}</small></article>`).join('')||'<p class="shoulder-empty">No assessments yet.</p>'}</section></div>`;
     detail.querySelector('[data-back]').onclick=()=>{back();load();};
     detail.querySelectorAll('[data-side]').forEach(b=>b.onclick=()=>{generation++;side=b.dataset.side;renderDetail();});
-    if(pig.active){detail.querySelector('[data-photo]').onclick=()=>addPhoto(pig);detail.querySelector('[data-assess]').onclick=()=>addAssessment(pig,photos);}
+    if(pig.active){detail.querySelector('[data-photo]').onclick=()=>addPhoto(pig);detail.querySelector('[data-assess]').onclick=()=>addAssessment(pig);}
     const version=generation;
     detail.querySelectorAll('[data-photo-id]').forEach(async img=>{
       try{const response=await fetch(base+'/photos/'+img.dataset.photoId+'/file',{headers:{Authorization:'Bearer '+getToken()}});if(!response.ok)throw new Error();const blob=await response.blob();if(version!==generation||!img.isConnected)return;const url=URL.createObjectURL(blob);urls.push(url);img.src=url;img.onclick=()=>showPhoto(url,img.alt);}catch{if(img.isConnected)img.alt='Photo could not be loaded. Reopen this card to retry.';}
@@ -75,20 +75,25 @@ export function setupShoulder(root,getToken,options={}) {
     try{const scale=Math.min(1,2000/Math.max(bitmap.width,bitmap.height)),canvas=document.createElement('canvas');canvas.width=Math.round(bitmap.width*scale);canvas.height=Math.round(bitmap.height*scale);const context=canvas.getContext('2d');context.fillStyle='#fff';context.fillRect(0,0,canvas.width,canvas.height);context.drawImage(bitmap,0,0,canvas.width,canvas.height);return await new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('Could not prepare photo')),'image/jpeg',0.85));}finally{bitmap.close();}
   }
   function addPhoto(pig){
-    const form=modal('Add shoulder photo',observationFields()+`<p>Current pen: ${esc(pig.room_name)} / ${esc(pig.pen_name)}. Change it in the sow card before taking the photo if needed.</p><label>Photo<input type="file" name="photo" accept="image/*" capture="environment" required></label><img data-preview hidden style="width:100%;max-height:240px;object-fit:contain"><label>Comment<textarea name="comment" maxlength="2000"></textarea></label>`,async form=>{
-      const body=new FormData(form),blob=await compress(form.elements.photo.files[0]);body.set('photo',blob,'shoulder.jpg');await request('/pigs/'+pig.id+'/photos',{method:'POST',body});side=form.elements.shoulder_side.value;await openPig(pig.id);
-    });
-    let preview;form.elements.photo.onchange=()=>{if(preview)URL.revokeObjectURL(preview);const file=form.elements.photo.files[0],img=form.querySelector('[data-preview]');img.hidden=!file;if(file){preview=URL.createObjectURL(file);img.src=preview;}};
-    form.closest('dialog').addEventListener('close',()=>{if(preview)URL.revokeObjectURL(preview);});
+    const photoSide=side,version=generation,button=$('[data-photo]');
+    const input=document.createElement('input');input.type='file';input.accept='image/*';input.capture='environment';input.hidden=true;document.body.append(input);
+    input.addEventListener('cancel',()=>input.remove(),{once:true});
+    input.onchange=async()=>{
+      const file=input.files[0];input.remove();if(!file)return;
+      button.disabled=true;button.textContent='Saving photo...';error.textContent='';
+      try{const body=new FormData();body.set('shoulder_side',photoSide);body.set('observed_date',today());body.set('photo',await compress(file),'shoulder.jpg');await request('/pigs/'+pig.id+'/photos',{method:'POST',body});if(version===generation)await openPig(pig.id);}
+      catch(e){error.textContent=e.message;}
+      finally{button.disabled=false;button.textContent='Take a photo';}
+    };
+    input.click();
   }
-  function addAssessment(pig,photos){
-    const form=modal('Add assessment',observationFields()+`<label>Shoulder Condition<select name="condition_code" required><option value="">Select condition</option>${SHOULDER_CONDITIONS.map(x=>`<option value="${x.code}">${x.icon} ${esc(x.label)}</option>`).join('')}</select></label><div data-condition-guide aria-live="polite"></div>`+'<label>Selected treatment<textarea name="treatment" maxlength="1000" required placeholder="Enter the selected treatment or observation only"></textarea></label><label>Related photo (optional)<select name="photo_id"></select></label><label>Comment<textarea name="comment" maxlength="2000"></textarea></label><p>This records the selected treatment; it does not create injections.</p>',async form=>{await request('/pigs/'+pig.id+'/assessments',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(form)))});side=form.elements.shoulder_side.value;await openPig(pig.id);});
+  function addAssessment(pig){
+    const form=modal('Add assessment',observationFields()+`<label>Shoulder Condition<select name="condition_code" required><option value="">Select condition</option>${SHOULDER_CONDITIONS.map(x=>`<option value="${x.code}">${x.icon} ${esc(x.label)}</option>`).join('')}</select></label><div data-condition-guide aria-live="polite"></div>`+'<label>Selected treatment<textarea name="treatment" maxlength="1000" required placeholder="Enter the selected treatment or observation only"></textarea></label>',async form=>{await request('/pigs/'+pig.id+'/assessments',{method:'POST',body:JSON.stringify({...Object.fromEntries(new FormData(form)),observed_date:today()})});side=form.elements.shoulder_side.value;await openPig(pig.id);},false);
     const guide=form.querySelector('[data-condition-guide]');
     form.elements.condition_code.onchange=()=>{
       const c=SHOULDER_CONDITIONS.find(x=>x.code===form.elements.condition_code.value);
       guide.innerHTML=c?`<div class="shoulder-condition ${c.color}"><strong>${c.icon} ${esc(c.label)}</strong><p>${esc(c.description)}</p><p><b>Action:</b> ${esc(c.action)}</p>${c.warning?'<p class="condition-urgent">'+esc(c.warning)+'</p>':''}</div>`:'';
     };
-    const options=()=>{form.elements.photo_id.innerHTML='<option value="">No linked photo</option>'+photos.filter(x=>x.shoulder_side===form.elements.shoulder_side.value).map(x=>`<option value="${x.id}">${esc(x.observed_date)} · Photo #${x.id}</option>`).join('');};form.elements.shoulder_side.onchange=options;options();
   }
   $('[data-add]').onclick=()=>editPig();$('[data-refresh]').onclick=()=>selected?openPig(selected.pig.id):load();$('[data-search]').oninput=list;$('[data-filter]').onchange=list;
   if(options.standalone){$('[data-add]').hidden=true;root.querySelector('.shoulder-toolbar h2').hidden=true;}

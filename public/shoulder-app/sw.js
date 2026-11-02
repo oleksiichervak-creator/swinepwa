@@ -1,4 +1,4 @@
-const CACHE='shoulder-app-v3';
+const CACHE='shoulder-app-v4';
 const ASSETS=['/shoulder-app/','/shoulder-app/index.html','/shoulder-app/app.js','/shoulder-app/manifest.json','/shoulder-app/icon.svg','/shoulder-app/icon-192.png','/shoulder-app/icon-512.png','/shoulder.js','/shoulder.css','/shoulder-conditions.js','/farestald-injections/styles.css?v=3'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('shoulder-app-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
