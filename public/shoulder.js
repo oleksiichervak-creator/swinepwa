@@ -1,11 +1,13 @@
+import { SHOULDER_CONDITIONS, shouldersDue } from './shoulder-conditions.js';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const today=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*60000).toISOString().slice(0,10);};
-export function setupShoulder(root,getToken) {
+export function setupShoulder(root,getToken,options={}) {
   if(!document.querySelector('link[data-shoulder]')){const css=document.createElement('link');css.rel='stylesheet';css.href='/shoulder.css';css.dataset.shoulder='';document.head.append(css);}
-  const base='/api/farestald/shoulder';let pigs=[],pens=[],selected=null,side='left',urls=[],generation=0;
+  const base='/api/farestald/shoulder';let pigs=[],pens=[],selected=null,side='left',urls=[],generation=0,mode='info';
   const revoke=()=>{urls.forEach(URL.revokeObjectURL);urls=[];};
   async function request(path,options={}){
     const response=await fetch(base+path,{...options,headers:{Authorization:'Bearer '+getToken(),...(options.body instanceof FormData?{}:{'Content-Type':'application/json'})}});
+    if(response.status===401){options.onUnauthorized?.();throw new Error('Please sign in again.');}
     if(!response.ok){const e=await response.json().catch(()=>({}));throw new Error(e.error||'Request failed');}return response.json();
   }
   root.classList.add('shoulder');
@@ -14,12 +16,12 @@ export function setupShoulder(root,getToken) {
   const penOptions=id=>'<option value="">Select pen</option>'+pens.map(p=>`<option value="${p.id}" ${String(id)===String(p.id)?'selected':''}>${esc(p.room_name)} / ${esc(p.name)}</option>`).join('');
   function list(){
     const q=$('[data-search]').value.trim().toLowerCase(),filter=$('[data-filter]').value;
-    const rows=pigs.filter(p=>p.sow_number.toLowerCase().includes(q)&&(filter==='all'||p.active===(filter==='active'))).sort((a,b)=>a.sow_number.localeCompare(b.sow_number,undefined,{numeric:true}));
-    $('[data-cards]').innerHTML=rows.length?rows.map(p=>`<button class="shoulder-pig" data-pig="${p.id}"><strong>Sow ${esc(p.sow_number)}</strong><span>${esc(p.room_name)} / Pen ${esc(p.pen_name)}</span><small>${p.active?'Active':'Closed'} ? ${p.last_photo_date ? 'Last photo: '+esc(p.last_photo_date) : 'No photos yet'}${p.active&&p.last_photo_date!==today()?' ? No photo today':''}</small></button>`).join(''):'<p>No sows found.</p>';
-    root.querySelectorAll('[data-pig]').forEach(b=>b.onclick=()=>openPig(b.dataset.pig));
+    const rows=pigs.filter(p=>(mode!=='today'||shouldersDue(p,today()).length>0)&&p.sow_number.toLowerCase().includes(q)&&(filter==='all'||p.active===(filter==='active'))).sort((a,b)=>a.sow_number.localeCompare(b.sow_number,undefined,{numeric:true}));
+    $('[data-cards]').innerHTML=rows.length?rows.map(p=>`<button class="shoulder-pig" data-pig="${p.id}"><strong>Sow ${esc(p.sow_number)}</strong><span>${esc(p.room_name)} / Pen ${esc(p.pen_name)}</span><small>${p.active?'Active':'Closed'} &middot; ${p.last_photo_date ? 'Last photo: '+esc(p.last_photo_date) : 'No photos yet'}${p.active&&p.last_photo_date!==today()?' - No photo today':''}</small>${mode==='today'?`<span>To check: ${shouldersDue(p,today()).join(', ')}</span>`:''}</button>`).join(''):(mode==='today'?'<p>All active shoulders have been checked today.</p>':'<p>No sows found.</p>');
+    root.querySelectorAll('[data-pig]').forEach(b=>b.onclick=()=>{const pig=pigs.find(p=>String(p.id)===b.dataset.pig);if(mode==='location')editPig(pig,true);else{if(mode==='today')side=shouldersDue(pig,today())[0]||'left';openPig(b.dataset.pig);}});
   }
   function back(){generation++;revoke();selected=null;$('[data-detail]').hidden=true;$('[data-list]').hidden=false;}
-  async function load(){error.textContent='';try{[pigs,pens]=await Promise.all([request('/pigs'),request('/pens')]);list();}catch(e){error.textContent=e.message;}}
+  async function load(){error.textContent='';try{[pigs,pens]=await Promise.all([request('/pigs'),request('/pens')]);list();return true;}catch(e){error.textContent=e.message;return false;}}
   async function openPig(id){
     const version=++generation;error.textContent='';revoke();
     try{const data=await request('/pigs/'+id);if(version!==generation)return;selected=data;$('[data-list]').hidden=true;$('[data-detail]').hidden=false;renderDetail();}catch(e){error.textContent=e.message;}
@@ -30,8 +32,8 @@ export function setupShoulder(root,getToken) {
     form.onsubmit=async event=>{event.preventDefault();const button=form.querySelector('[type=submit]');button.disabled=true;form.querySelector('.error').textContent='';try{await onSave(form);dialog.close();}catch(e){form.querySelector('.error').textContent=e.message;}finally{button.disabled=false;}};
     dialog.showModal();return form;
   }
-  function editPig(pig){
-    modal(pig?'Sow details':'Add sow',`<label>Sow number<input name="sow_number" required maxlength="100" inputmode="numeric" value="${esc(pig?.sow_number)}"></label><label>Current pen<select name="pen_id" required>${penOptions(pig?.pen_id)}</select></label>${pig?`<label>Observation<select name="active"><option value="true" ${pig.active?'selected':''}>Active</option><option value="false" ${!pig.active?'selected':''}>Closed</option></select></label>`:''}`,async form=>{
+  function editPig(pig,locationOnly=false){
+    modal(locationOnly?'Change location':pig?'Sow details':'Add sow',`<label ${locationOnly?'hidden':''}>Sow number<input name="sow_number" required maxlength="100" inputmode="numeric" value="${esc(pig?.sow_number)}"></label><label>Current pen<select name="pen_id" required>${penOptions(pig?.pen_id)}</select></label>${pig?`<label ${locationOnly?'hidden':''}>Observation<select name="active"><option value="true" ${pig.active?'selected':''}>Active</option><option value="false" ${!pig.active?'selected':''}>Closed</option></select></label>`:''}`,async form=>{
       const data=Object.fromEntries(new FormData(form));if(pig)data.active=data.active==='true';
       const saved=await request('/pigs'+(pig?'/'+pig.id:''),{method:pig?'PATCH':'POST',body:JSON.stringify(data)});await load();await openPig(saved.id);
     });
@@ -64,9 +66,15 @@ export function setupShoulder(root,getToken) {
     form.closest('dialog').addEventListener('close',()=>{if(preview)URL.revokeObjectURL(preview);});
   }
   function addAssessment(pig,photos){
-    const form=modal('Add assessment',observationFields()+'<label>Condition<textarea name="condition" maxlength="1000" required placeholder="Describe the shoulder condition"></textarea></label><label>Selected treatment<textarea name="treatment" maxlength="1000" required placeholder="Enter the selected treatment or observation only"></textarea></label><label>Related photo (optional)<select name="photo_id"></select></label><label>Comment<textarea name="comment" maxlength="2000"></textarea></label><p>This records the selected treatment; it does not create injections.</p>',async form=>{await request('/pigs/'+pig.id+'/assessments',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(form)))});side=form.elements.shoulder_side.value;await openPig(pig.id);});
+    const form=modal('Add assessment',observationFields()+`<label>Shoulder Condition<select name="condition_code" required><option value="">Select condition</option>${SHOULDER_CONDITIONS.map(x=>`<option value="${x.code}">${x.icon} ${esc(x.label)}</option>`).join('')}</select></label><div data-condition-guide aria-live="polite"></div>`+'<label>Selected treatment<textarea name="treatment" maxlength="1000" required placeholder="Enter the selected treatment or observation only"></textarea></label><label>Related photo (optional)<select name="photo_id"></select></label><label>Comment<textarea name="comment" maxlength="2000"></textarea></label><p>This records the selected treatment; it does not create injections.</p>',async form=>{await request('/pigs/'+pig.id+'/assessments',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(form)))});side=form.elements.shoulder_side.value;await openPig(pig.id);});
+    const guide=form.querySelector('[data-condition-guide]');
+    form.elements.condition_code.onchange=()=>{
+      const c=SHOULDER_CONDITIONS.find(x=>x.code===form.elements.condition_code.value);
+      guide.innerHTML=c?`<div class="shoulder-condition ${c.color}"><strong>${c.icon} ${esc(c.label)}</strong><p>${esc(c.description)}</p><p><b>Action:</b> ${esc(c.action)}</p>${c.warning?'<p class="condition-urgent">'+esc(c.warning)+'</p>':''}</div>`:'';
+    };
     const options=()=>{form.elements.photo_id.innerHTML='<option value="">No linked photo</option>'+photos.filter(x=>x.shoulder_side===form.elements.shoulder_side.value).map(x=>`<option value="${x.id}">${esc(x.observed_date)} · Photo #${x.id}</option>`).join('');};form.elements.shoulder_side.onchange=options;options();
   }
   $('[data-add]').onclick=()=>editPig();$('[data-refresh]').onclick=()=>selected?openPig(selected.pig.id):load();$('[data-search]').oninput=list;$('[data-filter]').onchange=list;
-  return {load:async()=>{back();await load();},reset:()=>{back();pigs=[];pens=[];$('[data-cards]').innerHTML='';$('[data-detail]').innerHTML='';document.querySelectorAll('.shoulder-dialog').forEach(d=>d.close());}};
+  if(options.standalone){$('[data-add]').hidden=true;root.querySelector('.shoulder-toolbar h2').hidden=true;}
+  return {show:async next=>{mode=next;back();$('[data-filter]').value=next==='info'?'all':'active';$('[data-search]').value='';$('[data-filter]').closest('label').hidden=next==='today';const ready=await load();if(ready&&next==='add')editPig();},load:async()=>{back();await load();},reset:()=>{back();pigs=[];pens=[];$('[data-cards]').innerHTML='';$('[data-detail]').innerHTML='';document.querySelectorAll('.shoulder-dialog').forEach(d=>d.close());}};
 }

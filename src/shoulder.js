@@ -1,3 +1,4 @@
+import { SHOULDER_CONDITIONS } from '../public/shoulder-conditions.js';
 import express from 'express';
 import multer from 'multer';
 import path from 'node:path';
@@ -30,6 +31,7 @@ export async function initializeShoulder(pool) {
       created_by_user_id BIGINT NOT NULL REFERENCES users(id), created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       FOREIGN KEY(photo_id,pig_id,shoulder_side) REFERENCES shoulder_photos(id,pig_id,shoulder_side) ON DELETE RESTRICT
     );
+    ALTER TABLE shoulder_assessments ADD COLUMN IF NOT EXISTS condition_code TEXT CHECK(condition_code IN ('redness','grade_1','grade_2','grade_3','grade_4','healed'));
     CREATE INDEX IF NOT EXISTS shoulder_photos_history ON shoulder_photos(pig_id,observed_date DESC,id DESC);
     CREATE INDEX IF NOT EXISTS shoulder_assessments_history ON shoulder_assessments(pig_id,observed_date DESC,id DESC);
   `);
@@ -52,7 +54,7 @@ export function createShoulderRouter(pool) {
   const directory=path.resolve(process.env.FILE_DIR||'files','shoulder');
   const upload=multer({storage:multer.memoryStorage(),limits:{fileSize:8*1024*1024,files:1,fields:5}}).single('photo');
   const pens=`SELECT p.id,p.name,r.name AS room_name FROM pens p JOIN rooms r ON r.id=p.room_id JOIN departments d ON d.id=r.department_id WHERE lower(trim(d.name))='farestald'`;
-  const pigSelect=`SELECT s.*,p.name AS pen_name,r.name AS room_name FROM shoulder_pigs s JOIN pens p ON p.id=s.pen_id JOIN rooms r ON r.id=p.room_id`;
+  const pigSelect=`SELECT s.*,COALESCE((SELECT json_agg(x) FROM (SELECT DISTINCT ON (shoulder_side) shoulder_side,condition_code,to_char(observed_date,'YYYY-MM-DD') AS observed_date FROM shoulder_assessments WHERE pig_id=s.id ORDER BY shoulder_side,observed_date DESC,id DESC) x),'[]'::json) AS latest_assessments,p.name AS pen_name,r.name AS room_name FROM shoulder_pigs s JOIN pens p ON p.id=s.pen_id JOIN rooms r ON r.id=p.room_id`;
   router.param('id',(req,res,next,id)=>/^[1-9]\d*$/.test(id)&&BigInt(id)<=9223372036854775807n?next():res.status(400).json({error:'Invalid ID'}));
   const validPen=async(client,id)=>{
     if(!/^[1-9]\d*$/.test(String(id)))fail('Select a Farestald pen');
@@ -75,7 +77,7 @@ export function createShoulderRouter(pool) {
   router.get('/pigs/:id',async(req,res,next)=>{
     try{const pig=(await pool.query(pigSelect+' WHERE s.id=$1',[req.params.id])).rows[0];if(!pig)fail('Sow not found',404);
       const photos=(await pool.query(`SELECT s.id,pig_id,shoulder_side,to_char(observed_date,'YYYY-MM-DD') AS observed_date,pen_id,pen_label,comment,s.created_at,u.username AS created_by FROM shoulder_photos s JOIN users u ON u.id=s.created_by_user_id WHERE pig_id=$1 ORDER BY observed_date DESC,s.id DESC`,[pig.id])).rows;
-      const assessments=(await pool.query(`SELECT s.id,pig_id,shoulder_side,to_char(observed_date,'YYYY-MM-DD') AS observed_date,condition,treatment,comment,photo_id,s.created_at,u.username AS created_by FROM shoulder_assessments s JOIN users u ON u.id=s.created_by_user_id WHERE pig_id=$1 ORDER BY observed_date DESC,s.id DESC`,[pig.id])).rows;
+      const assessments=(await pool.query(`SELECT s.id,pig_id,shoulder_side,to_char(observed_date,'YYYY-MM-DD') AS observed_date,condition,condition_code,treatment,comment,photo_id,s.created_at,u.username AS created_by FROM shoulder_assessments s JOIN users u ON u.id=s.created_by_user_id WHERE pig_id=$1 ORDER BY observed_date DESC,s.id DESC`,[pig.id])).rows;
       res.set('Cache-Control','no-store').json({pig,photos,assessments});
     }catch(e){next(e);}
   });
@@ -96,11 +98,13 @@ export function createShoulderRouter(pool) {
     }catch(e){if(client)await client.query('ROLLBACK');if(filename)await fs.unlink(path.join(directory,filename)).catch(()=>{});next(e);}finally{client?.release();}
   });
   router.post('/pigs/:id/assessments',async(req,res,next)=>{
-    try{const o=shoulderObservation(req.body),condition=text(req.body.condition,1000),treatment=text(req.body.treatment,1000);
+    try{const o=shoulderObservation(req.body),choice=SHOULDER_CONDITIONS.find(x=>x.code===req.body.condition_code);
+      if(!choice)fail('Select a shoulder condition');
+      const condition=choice.label,treatment=text(req.body.treatment,1000);
       const pig=(await pool.query('SELECT active FROM shoulder_pigs WHERE id=$1',[req.params.id])).rows[0];if(!pig)fail('Sow not found',404);if(!pig.active)fail('Reopen observation to add an assessment');
       const photo=req.body.photo_id||null;if(photo&&!/^[1-9]\d*$/.test(String(photo)))fail('Invalid photo');
       if(photo&&!(await pool.query('SELECT id FROM shoulder_photos WHERE id=$1 AND pig_id=$2 AND shoulder_side=$3',[photo,req.params.id,o.side])).rowCount)fail('Photo must belong to this sow and shoulder');
-      const row=(await pool.query(`INSERT INTO shoulder_assessments(pig_id,shoulder_side,observed_date,condition,treatment,comment,photo_id,created_by_user_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,[req.params.id,o.side,o.date,condition,treatment,o.comment,photo,req.user.id])).rows[0];res.status(201).json(row);
+      const row=(await pool.query(`INSERT INTO shoulder_assessments(pig_id,shoulder_side,observed_date,condition,treatment,comment,photo_id,created_by_user_id,condition_code) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,[req.params.id,o.side,o.date,condition,treatment,o.comment,photo,req.user.id,choice.code])).rows[0];res.status(201).json(row);
     }catch(e){next(e);}
   });
   router.use((e,req,res,next)=>{if(e.status)return res.status(e.status).json({error:e.message});if(e.code==='23505')return res.status(409).json({error:'This sow number is already registered. Open its existing card.'});if(e.code==='23503')return res.status(409).json({error:'Referenced record is no longer available'});next(e);});

@@ -150,3 +150,9 @@ The website and Farestald mobile app share the Shoulder screen. Users with Fares
 Startup creates shoulder_pigs, shoulder_photos and shoulder_assessments. Relations use stable pig IDs; renaming a sow preserves history. Each photo stores the pen ID and room/pen label at upload time. Multiple photos per side/day are allowed. Assessments may reference a photo belonging to the same pig and side.
 
 Photos are compressed in the browser to JPEG with a maximum 2000-pixel edge, uploaded with an 8 MB server limit, and stored under /app/files/shoulder in the existing persistent files_data volume. Photo downloads require Farestald authorization. Backups must include the PostgreSQL database and the files_data volume together; persistent storage itself is not a backup.
+
+### Standalone Shoulder PWA
+
+Install from Farestald > Shoulder > Install Shoulder, or open /shoulder-app/. The application has its own manifest, scope, cache and login token. It uses Farestald permissions and the existing shoulder data. Its menu provides Add sow, Change location, Sow to check today and Sow info. Network access is required to read and save observations; the service worker caches application assets only.
+
+New assessments select one of six condition codes (redness, grade_1 through grade_4, healed), displaying the descriptions and actions supplied by the farm. Existing free-text assessment history remains readable. Each active sow is due when either shoulder has no assessment for today, unless that shoulder's latest condition is healed. A new sow initially requires checking both shoulders; closed observations are excluded. Treatment notes remain separate from injection scheduling.

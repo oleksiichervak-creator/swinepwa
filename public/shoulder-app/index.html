@@ -1,0 +1,28 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#245c43"><link rel="manifest" href="/shoulder-app/manifest.json"><link rel="icon" href="/shoulder-app/icon.svg"><link rel="apple-touch-icon" href="/shoulder-app/icon-192.png"><link rel="stylesheet" href="/farestald-injections/styles.css?v=3"><link rel="stylesheet" href="/shoulder.css"><style>.user-picker{min-width:0;margin:0 0 18px;padding:0;border:0}.user-picker legend{margin-bottom:9px;color:#33483c;font-size:13px;font-weight:750}.user-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.user-button{display:grid;justify-items:center;gap:7px;min-width:0;padding:11px 5px;border:2px solid transparent;border-radius:15px;background:#eef4f0;color:#294838}.user-button span{display:grid;place-items:center;width:48px;height:48px;border-radius:50%;background:#d3e4d8;color:#245c43;font-size:17px;font-weight:900}.user-button strong{max-width:100%;overflow:hidden;text-overflow:ellipsis;font-size:12px}.user-button.selected{border-color:#245c43;background:#fff;box-shadow:0 5px 15px #245c4320}.user-button.selected span{background:#245c43;color:#fff}.today-injection-card{border-left:6px solid #245c43}.today-injection-card header{align-items:center}.pen-label{display:block;color:#6b7c72;font-size:10px;font-weight:900;letter-spacing:.14em}.today-injection-card .pen-number{font-size:38px;line-height:1;color:#173f2e}.sow-number{padding:7px 9px;border-radius:9px;background:#eef5f0;font-size:13px}</style><title>Shoulder</title></head><body><main>
+    <section id="login-view" class="view login-view">
+      <div class="brand" aria-hidden="true">FI</div>
+      <p class="eyebrow">FARESTALD</p>
+      <h1>Shoulder</h1>
+      <p class="intro">Sign in to plan and register treatments.</p>
+      <form id="login-form" class="panel">
+        <fieldset class="user-picker"><legend>Choose user</legend><div id="login-users" class="user-grid"><span>Loading users…</span></div></fieldset>
+        <input id="login-user" type="hidden">
+        <label>Password
+          <input id="login-password" class="pin-display" type="password" required readonly inputmode="none" autocomplete="off" aria-label="Numeric password">
+        </label>
+        <div id="pin-keypad" class="pin-keypad" aria-label="Numeric password keypad">
+          <button type="button" data-pin="1">1</button><button type="button" data-pin="2">2</button><button type="button" data-pin="3">3</button>
+          <button type="button" data-pin="4">4</button><button type="button" data-pin="5">5</button><button type="button" data-pin="6">6</button>
+          <button type="button" data-pin="7">7</button><button type="button" data-pin="8">8</button><button type="button" data-pin="9">9</button>
+          <button type="button" class="pin-action" data-pin-clear aria-label="Clear password">Clear</button><button type="button" data-pin="0">0</button><button type="button" class="pin-action" data-pin-backspace aria-label="Delete last digit">&#9003;</button>
+        </div>
+        <p id="login-error" class="error" role="alert"></p>
+        <button type="submit">Sign in</button>
+      </form>
+    </section>
+
+
+<section id="app-view" hidden><header><button id="back-button" type="button" class="icon-button" hidden aria-label="Back">&larr;</button><h1 id="screen-title">Shoulder</h1><button id="logout-button" type="button" class="text-button">Sign out</button></header><p id="current-user"></p><div id="home-screen" class="choice-grid"><button class="choice-card" data-mode="add"><span class="choice-icon">+</span><span><strong>Add sow</strong><small>Register sow and current pen</small></span></button><button class="choice-card accent" data-mode="location"><span class="choice-icon">&#8646;</span><span><strong>Change location</strong><small>Update the current pen</small></span></button><button class="choice-card accent" data-mode="today"><span class="choice-icon">&#10003;</span><span><strong>Sow to check today</strong><small>Daily shoulder assessments</small></span></button><button class="choice-card accent" data-mode="info"><span class="choice-icon">i</span><span><strong>Sow info</strong><small>Photos, conditions and treatment history</small></span></button></div><section id="shoulder-screen" hidden></section></section>
+<button id="install-app" type="button" class="text-button">Install Shoulder</button><p id="connection-note" role="status"></p>
+<dialog id="install-dialog"><div style="padding:22px"><h2>Install Shoulder</h2><p id="install-help"></p><button id="install-native" type="button">Install</button><button id="install-close" type="button" class="text-button">Close</button></div></dialog>
+</main><script src="/shoulder-app/app.js" type="module"></script></body></html>

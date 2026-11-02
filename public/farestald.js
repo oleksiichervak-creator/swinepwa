@@ -18,6 +18,7 @@ export function setupFarestald({api,getUser,getToken}) {
   nav.insertAdjacentHTML('beforeend','<button class="nav-button" role="tab" aria-selected="false" aria-controls="farestald-shoulder-page" data-page="farestald-shoulder">Shoulder</button>');
   $('#admin').insertAdjacentHTML('beforeend','<section id="farestald-shoulder-page" role="tabpanel" hidden></section>');
   const shoulder=setupShoulder($('#farestald-shoulder-page'),getToken);
+  $('#farestald-shoulder-page .shoulder-toolbar').insertAdjacentHTML('beforeend','<a class="pwa-install-link" href="/shoulder-app/?install=1" style="padding:11px 16px;border-radius:10px;background:#245c43;color:white;text-decoration:none;font-weight:700">Install Shoulder</a>');
   const caches = new Map();
   for (const section of sections) {
     const prefix = `farestald-${section.key}`;
